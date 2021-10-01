@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding = "utf-8"?>
+<CATALOG>
+    <COMMODITIES NAME="TYRE" ID="1" VALUE="Шины">
+        <DESCRIPTION>
+            <NNOMMODIF>RN</NNOMMODIF>
+            <SMODIFNAME>Наименование</SMODIFNAME>
+            <SGOODLAND>Происхождение</SGOODLAND>
+            <SSEASON>Сезон резины</SSEASON>
+            <SMARKA>Марка</SMARKA>
+            <SMODEL>Модель</SMODEL>
+            <SDIAMETR>Диаметр</SDIAMETR>
+            <SWIDTH>Ширина</SWIDTH>
+            <SHEIGHT>Профиль</SHEIGHT>
+            <STHORNING>Шипы</STHORNING>
+            <SSPEED>Индекс скорости</SSPEED>
+            <SLOAD>Индекс нагрузки</SLOAD>
+            <STHORNTYPE>Вид ошиповки</STHORNTYPE>
+            <SMNFCODE>Код производителя</SMNFCODE>
+            <SSELLOUT>Распродажа</SSELLOUT>
+            <SPLACE>Источник</SPLACE>
+            <TERRITORY_NAME>Территория</TERRITORY_NAME>
+            <NREST>Остаток</NREST>
+            <NPRICE_DELAYED>Цена по отсрочке</NPRICE_DELAYED>
+            <NPRICE_PREPAYMENT>Цена по предоплате</NPRICE_PREPAYMENT>
+            <NPRICE_RRP>РРЦ</NPRICE_RRP>
+            <NPRICE_CLI_D>Цена клиента от отсрочки</NPRICE_CLI_D>
+            <NPRICE_CLI_P>Цена клиента от предоплаты</NPRICE_CLI_P>
+            <SPICTURE>Ссылка на изображение</SPICTURE>
+            <SMNFYEAR>Год производства</SMNFYEAR>
+        </DESCRIPTION>
+        <COMMODITY>
+            <NNOMMODIF>86846718350</NNOMMODIF>
+            <SMODIFNAME>Achilles 195/60/15 H 88 Platinum 2011</SMODIFNAME>
+            <SGOODLAND>Импортная</SGOODLAND>
+            <SSEASON>Летняя</SSEASON>
+            <SMARKA>Achilles</SMARKA>
+            <SMODEL>Platinum</SMODEL>
+            <SDIAMETR>15</SDIAMETR>
+            <SWIDTH>195</SWIDTH>
+            <SHEIGHT>60</SHEIGHT>
+            <STHORNING>н/ш.</STHORNING>
+            <SSPEED>H</SSPEED>
+            <SLOAD>88</SLOAD>
+            <STHORNTYPE/>
+            <SMNFCODE/>
+            <SSELLOUT>Да</SSELLOUT>
+            <SPLACE>Склад</SPLACE>
+            <TERRITORY_NAME>Электроуг.</TERRITORY_NAME>
+            <NREST>1</NREST>
+            <NPRICE_DELAYED>2244</NPRICE_DELAYED>
+            <NPRICE_PREPAYMENT>2244</NPRICE_PREPAYMENT>
+            <NPRICE_RRP>2510</NPRICE_RRP>
+            <NPRICE_CLI_D/>
+            <NPRICE_CLI_P/>
+            <SPICTURE/>
+            <SMNFYEAR>2011</SMNFYEAR>
+        </COMMODITY>
+    </COMMODITIES>
+</CATALOG>

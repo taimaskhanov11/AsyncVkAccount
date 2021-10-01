@@ -1,0 +1,33 @@
+<html>
+    <head>
+        <script src="eel.js"></script>
+        <script>
+            eel.expose(readTextBox)
+            function readTextBox() {
+                var textbox = document.getElementById("box");
+                return textbox.value;
+            }
+
+            function sendMessage() {
+                var textbox = document.getElementById("box");
+                eel.send(textbox.value)(processAcknowledgement);
+            }
+
+            function processAcknowledgement(result) {
+                if (result == "ok") {
+                    var textbox = document.getElementById("box");
+                    textbox.value = "";
+                }
+            }
+        </script>
+    </head>
+    <body>
+        <h1>Type some text!</h1>
+        <h2>The server isn't snooping on you I swear</h2>
+
+        <p>
+            <input type="text" id="box">
+            <button onclick="sendMessage()">Send</button>
+        </p>
+    </body>
+</html>

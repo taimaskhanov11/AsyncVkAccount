@@ -1,0 +1,34 @@
+body {
+    background-color: slategray;
+    color: white;
+    font-family: "Segoe UI Symbol";
+}
+
+.row {
+    font-size: 5em;
+}
+
+table, td {
+    border: 2px solid white;
+}
+
+.responseToggle {
+    border: 2px solid white;
+    width: 1.3em;
+    font-size: 0.75em;
+    border-radius: 0.75em;
+}
+
+#submitBtn {
+    font-size: 2em;
+}
+
+#waitDiv {
+    color: black;
+    padding: 1em;
+    background-color: rgba(255,255,255,0.5);
+    position: absolute;
+    left: 20%;
+    top: 20%;
+    font-size: 2em;
+}

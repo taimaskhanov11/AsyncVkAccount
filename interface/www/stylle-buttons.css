@@ -1,0 +1,19 @@
+.elem {
+  background-color: #f2f2f2;
+  margin: 5px;
+  animation: slidein 0.5s forwards;
+  font-style: italic;
+}
+
+@keyframes slidein {
+  from {
+    height: 0px;
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    height:var(--h); /*This will change for each element */
+    transform: scale(1);
+    opacity: 1;
+  }
+}
