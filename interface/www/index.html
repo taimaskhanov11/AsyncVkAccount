@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="eel.js"></script>
+    <script src="main.js"></script>
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+          integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="styles.css">
+    <link rel="stylesheet" type="text/css" href="stylle-buttons.css">
+
+</head>
+<body onload="createDiv()">
+    <div class="collect">
+        <div class="hello-text">
+            <div class="text-left" id="text1">
+                Ян Морозов
+                <br>
+                <div class="text-left img_preview" id ="photo1-container" >
+                    <img src="media/favicon.ico" alt="Fancy" id="photo1">
+                </div>
+                <br>
+                <button onclick="createDiv()" type="button" class="btn btn-primary position-relative btn-sm alert-btn">
+                    Numbers
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">99
+                        <!--                        <span class="visually-hidden">unread messages</span>-->
+                    </span>
+                </button>
+                <button onclick="createDiv('users')" type="button" class="btn btn-primary position-relative btn-sm alert-btn">
+                    New Users
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">99
+                        <!--                        <span class="visually-hidden">unread messages</span>-->
+                    </span>
+                </button>
+                <button onclick="createDiv('unusers')" type="button" class="btn btn-primary position-relative btn-sm alert-btn">
+                    New UnUsers
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">99
+                        <!--                        <span class="visually-hidden">unread messages</span>-->
+                    </span>
+                </button>
+                <button type="button" class="btn btn-primary position-relative btn-sm alert-btn">
+                    Inbox
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">99
+                        <!--                        <span class="visually-hidden">unread messages</span>-->
+                    </span>
+                </button>
+
+            </div>
+
+            <div class="text-left" id="text2">
+
+            </div>
+        </div>
+
+        <div class="progress" id="progress">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="75"
+                 aria-valuemin="0" aria-valuemax="100" style="width: 0" id="status-bar">0%
+            </div>
+        </div>
+
+    </div>
+
+    <div id="content-part">
+        <ul class="list-group  list-group-flush " id="content1">
+            <!--            <li class="group-item" style="margin-top:8em">A second item-->
+        </ul>
+    </div>
+
+    <div class="content-div" id="content-div">
+
+
+    </div>
+
+    <div class="wrapper">
+
+        <!--        <div class="btn-group" role="group" aria-label="Basic mixed styles example">-->
+        <!--            <button type="button" class="btn btn-danger">Left</button>-->
+        <!--            <button type="button" class="btn btn-success">Right</button>-->
+        <!--        </div>-->
+
+        <ul class="list-group list-group-flush" id="content2">
+            <li class="list-group-item">
+                <button onclick="turnScroll()" id='btn-scroll' type="button" class="btn btn-outline-danger btn-sm">
+                    Auto-scroll OFF
+                </button>
+            </li>
+            <li class="list-group-item1">
+                <div class="btn-group" id='btn-scroll1' role="group" aria-label="Basic mixed styles example">
+                    <button onclick="changeButtonColor('danger', 'button-third1'); eel.color_change('red')" id="button-third1"
+                            type="button" class="btn btn-danger third ">Red
+                    </button>
+                    <button onclick="changeButtonColor('warning','button-third2' ); eel.color_change('yellow')"
+                            id="button-third2"
+                            type="button" class="btn btn-warning third">Yellow
+                    </button>
+                    <button onclick="changeButtonColor('success','button-third3' ); eel.color_change('green')"
+                            id="button-third3"
+                            type="button" class="btn btn-success third">Green
+                    </button>
+                </div>
+
+                <!--                <button onclick="eel.color_change('red')" id='btn-scroll1' type="button" class="btn btn-success btn-sm">Color-->
+                <!--                    change-->
+                <!--                </button>-->
+            </li>
+            <li class="list-group-item">
+                <button onclick="turnScroll()" id='btn-scroll2' type="button" class="btn btn-success btn-sm">ON</button>
+            </li>
+            <li class="list-group-item">
+                <button onclick="turnScroll()" id='btn-scroll3' type="button" class="btn btn-success btn-sm">ON</button>
+            </li>
+
+        </ul>
+
+
+    </div>
+
+
+    <!--    <div class="choice-func" style="position: fixed; top: 0; right: 10px ; bottom: 0;" >-->
+    <!--        <ul class="list-group">-->
+    <!--            <li class="list-group-item">-->
+    <!--                <input class="form-check-input me-1" type="checkbox" value="" aria-label="...">-->
+    <!--                First checkbox-->
+    <!--            </li>-->
+    <!--            <li class="list-group-item">-->
+    <!--                <input class="form-check-input me-1" type="checkbox" value="" aria-label="...">-->
+    <!--                Second checkbox-->
+    <!--            </li>-->
+    <!--            <li class="list-group-item">-->
+    <!--                <input class="form-check-input me-1" type="checkbox" value="" aria-label="...">-->
+    <!--                Third checkbox-->
+    <!--            </li>-->
+    <!--            <li class="list-group-item">-->
+    <!--                <input class="form-check-input me-1" type="checkbox" value="" aria-label="...">-->
+    <!--                Fourth checkbox-->
+    <!--            </li>-->
+    <!--            <li class="list-group-item">-->
+    <!--                <input class="form-check-input me-1" type="checkbox" value="" aria-label="...">-->
+    <!--                Fifth checkbox-->
+    <!--            </li>-->
+    <!--        </ul>-->
+    <!--    </div>-->
+
+
+</body>
+</html>

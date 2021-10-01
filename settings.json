@@ -1,0 +1,36 @@
+{
+    "version": "2.2.3.4",
+    "text_handler_controller": {
+        "accept_interface": false,
+        "accept_logging": true,
+        "accept_printing": true,
+        "accept_print_property": true
+    },
+    "signs": {
+        "red": "✖",
+        "green": "◯",
+        "yellow": "⬤",
+        "mark": "[✓]",
+        "magenta": "►",
+        "time": "⌛",
+        "version": "∆"
+    },
+    "log_colors": {
+        "info": [
+            "green",
+            "◯"
+        ],
+        "warning": [
+            "yellow",
+            "⬤"
+        ],
+        "error": [
+            "red",
+            "✖"
+        ],
+        "debug": [
+            "white",
+            "இ"
+        ]
+    }
+}

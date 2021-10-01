@@ -1,0 +1,12 @@
+{
+    'tokens': [
+        '9e9a3ac3f141f84ea7ace8d0759465097b32928480d7bf952536b8e334f0f48c85a8f0347564cbdd3a387',
+//        '0f09e4bcae0cd485264a00ffcf433c2bdb7eea763455f1ca4530398b7ad0ad633f82228a60697119341ff',
+//        '6cb102e6df399b914ad41560d14fe131e3df8f45439459dceae074adf9e2941e29b6722f045b0566957be'
+    ],
+    'proxy': 'YBJ4Eq:u5HmBf@217.29.62.158:14866',
+    'delay_response_from': 4,
+    'delay_response_to': 5,
+    'delay_typing_from': 3,
+    'delay_typing_to': 4
+}
