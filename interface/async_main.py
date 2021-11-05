@@ -3,19 +3,23 @@
 import asyncio
 import os
 import random
+from pathlib import Path
 
 from more_termcolor import colored
 import async_eel
 
 
 async def init_eel():
-    if __name__ in ['__main__']:
-        # print('HELLO')
-        async_eel.init(r'www')
-    else:
-        # eel.init('VkBotDir/main/interface/www')
-        # print(os.getcwd())
-        async_eel.init(r'interface/www')
+    # if __name__ in ['__main__']:
+    #     # print('HELLO')
+    #     async_eel.init(r'www')
+    # else:
+    #     # eel.init('VkBotDir/main/interface/www')
+    #     # print(os.getcwd())
+    #     async_eel.init(r'interface/www')
+    path = Path(__file__).resolve().parent
+    async_eel.init(f'{path}/www')
+
     port = random.randint(1, 8000)
     print(port)
     await async_eel.start('index.html', block=False, size=(1000, 600), host='localhost', port=port)  # todo

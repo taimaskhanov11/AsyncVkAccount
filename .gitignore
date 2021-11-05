@@ -1,1 +1,6 @@
 *.log
+dist1
+build
+*.spec
+__pycache__
+.idea
