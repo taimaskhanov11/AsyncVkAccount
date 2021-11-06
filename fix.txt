@@ -1,31 +1,15 @@
 *****Main*****
 
 
+0.9.6.7
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+add meta for User and VkController class
+add tg_bot for success number
+add multiprocessing and asynchronous
+update settings.json
+delete config.json5
+add validators.json
+fix bugs and update settings.py decorators
 
 
 
