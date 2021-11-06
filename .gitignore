@@ -4,3 +4,4 @@ build
 *.spec
 __pycache__
 .idea
+tests

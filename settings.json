@@ -1,36 +1,20 @@
 {
-    "version": "2.2.3.4",
-    "text_handler_controller": {
-        "accept_interface": true,
-        "accept_logging": true,
-        "accept_printing": true,
-        "accept_print_property": true
-    },
-    "signs": {
-        "red": "✖",
-        "green": "◯",
-        "yellow": "⬤",
-        "mark": "[✓]",
-        "magenta": "►",
-        "time": "⌛",
-        "version": "∆"
-    },
-    "log_colors": {
-        "info": [
-            "green",
-            "◯"
-        ],
-        "warning": [
-            "yellow",
-            "⬤"
-        ],
-        "error": [
-            "red",
-            "✖"
-        ],
-        "debug": [
-            "white",
-            "இ"
-        ]
-    }
+  "version": "0.8.2.2",
+  "text_handler_controller": {
+    "accept_interface": false,
+    "accept_logging": true,
+    "accept_printing": true,
+    "accept_print_property": true
+  },
+  "tokens": [
+    "9e9a3ac3f141f84ea7ace8d0759465097b32928480d7bf952536b8e334f0f48c85a8f0347564cbdd3a387",
+    "3a1ef0834325b306e8390699bbd0b781c9fd83b385a1b837df67c77043e6a5f34ff656683cea10157b783"
+  ],
+  "telegram_token": "2131641220:AAH5jR7DpqfXYV9ktEJSnI8HVvteIZLWCnc",
+  "user_id":269019356 ,
+  "proxy": "YBJ4Eq:u5HmBf@217.29.62.158:14866",
+  "delay_response_from": 4,
+  "delay_response_to": 5,
+  "delay_typing_from": 3,
+  "delay_typing_to": 4
 }

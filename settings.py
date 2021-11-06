@@ -4,7 +4,9 @@ import json
 import os
 import pathlib
 import time
+
 from more_termcolor import colored
+
 from logs.log_settings import talk_log, prop_log
 
 set_dir = os.path.join(os.path.dirname(__file__), 'settings.json')
@@ -13,13 +15,33 @@ print(pathlib.Path(__file__).parent)
 with open(set_dir, 'r', encoding='utf-8-sig') as f:
     settings = json.load(f)
 
+with open('views_json/validators.json', 'r', encoding='utf-8-sig') as f:
+    views = json.load(f)
+
+
 VERSION = settings['version']
 TEXT_HANDLER_CONTROLLER = settings['text_handler_controller']
-SIGNS = settings['signs']
-LOG_COLORS = settings['log_colors']
+TOKENS = settings['tokens']
 
 if TEXT_HANDLER_CONTROLLER['accept_interface']:
     from interface.async_main import interface
+
+SIGNS = {
+    "red": "✖",
+    "green": "◯",
+    "yellow": "⬤",
+    "mark": "[✓]",
+    "magenta": "►",
+    "time": "⌛",
+    "version": "∆"
+}
+
+LOG_COLORS = {
+    "info": ["green", "◯"],
+    "warning": ["yellow", "⬤"],
+    "error": ["red", "✖"],
+    "debug": ["white", "இ"]
+}
 
 
 async def TextHandler(sign, text, log_type='info', color=None, full=False, off_interface=False, talk=True, prop=False):
@@ -47,26 +69,27 @@ async def TextHandler(sign, text, log_type='info', color=None, full=False, off_i
 def time_track(func):
     path = os.path.basename(inspect.getsourcefile(func))
 
-    def wrapper(*args, **kwargs):
+    @functools.wraps(func)
+    def sync_wrapper(*args, **kwargs):
         now = time.time()
         res = func(*args, **kwargs)
         end = time.time() - now
         execute_time = f'{"Executed time"} {end} s'
         func_name = f'{path}/{func.__name__}'
-        print(func_name)
+        # print(func_name)
         TextHandler(SIGNS['time'], f'{func_name:<36} {execute_time}', 'debug',
                     off_interface=True, talk=False, prop=True)
         # prop_log.debug(f'{func.__name__} Executed time {round(time.time() - now, 5)} s')
         return res
 
-    return wrapper
+    return sync_wrapper
 
 
 def async_time_track(func):
     path = os.path.basename(inspect.getsourcefile(func))
 
     @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
+    async def async_wrapper(*args, **kwargs):
         now = time.time()
         res = await func(*args, **kwargs)
         end = time.time() - now
@@ -77,4 +100,4 @@ def async_time_track(func):
         # prop_log.debug(f'{func.__name__} Executed time {round(time.time() - now, 5)} s')
         return res
 
-    return wrapper
+    return async_wrapper

@@ -10,3 +10,5 @@ with open('../config.json5', 'r', encoding='utf-8') as config:
     config = json5.load(config)
 
     print(config)
+
+
