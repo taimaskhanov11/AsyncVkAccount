@@ -72,20 +72,21 @@ class Users(BaseModel):
     @classmethod
     @async_time_track
     async def change_value(cls, user_id, title, value):
-        user = cls.get_user(user_id)
+        user = await cls.get_user(user_id)
         setattr(user, title, value)
         user.save()
 
     @classmethod
     @async_time_track
     async def get_value(cls, user_id, title):
-        user = cls.get_user(user_id)
+        user =await cls.get_user(user_id)
         return getattr(user, title)
 
     @classmethod
     @async_time_track
     async def get_ref_count(cls, user_id):
-        return cls.get_user(user_id).ref
+        user = await cls.get_user(user_id)
+        return user.ref
 
     @classmethod
     @async_time_track

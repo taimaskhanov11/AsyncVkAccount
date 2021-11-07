@@ -1,6 +1,12 @@
 *****Main*****
 
+1.2.0.0
 
+add delay between messages
+fix tg_bot send_message
+fix first message delay 0 s
+add proxy for each bot
+____________________
 0.9.6.7
 
 add meta for User and VkController class
@@ -34,7 +40,9 @@ fix bugs and update settings.py decorators
 ------ TODO
 
 _ todo main
-#todo добавить mathch case
+# todo написать тесты
+# todo сделать задержку перед первым ответом
+# todo добавить mathch case
 # todo добавить мультипроцессорность
 # todo добавить прокси
 # todo добавить для каждого пользователя класс с выгрузкой основных методов при первом запустке

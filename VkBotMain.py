@@ -102,7 +102,7 @@ class ControlMeta(type):
         for key, val in attrs.items():
             if inspect.isfunction(val):
 
-                if key in ('__init__', 'act', 'parse_event', 'start_send_message'):
+                if key in ('__init__', 'act', 'parse_event', 'start_send_message', 'send_status_tg'):
                     continue
                 # print(val)
                 if asyncio.iscoroutinefunction(val):
@@ -126,6 +126,7 @@ class User(metaclass=ControlMeta):
         self.len_template = len(TALK_TEMPLATE)
         self.half_template = self.len_template // 2
         self.block_template = 0
+        self.last_answer_time = 0
 
     async def append_to_exel(self, user_id, text, name):
         time = datetime.datetime.now().replace(microsecond=0)
@@ -158,9 +159,12 @@ class User(metaclass=ControlMeta):
                     await window_update(self.user_id, self.name, text, mode='numbers')
 
                 await TextHandler(SIGNS['mark'], f'{self.user_id} / {self.name} Номер получен добавление в unusers')
-                overlord.send_status_tg(f'{overlord.info["first_name"]} {overlord.info["last_name"]}\n'
-                                        f'{self.user_id}, https://vk.com/id{self.user_id}, {self.name}\n'
-                                        f'{text}')
+                overlord.send_status_tg(f'бот {overlord.info["first_name"]} {overlord.info["last_name"]}\n'
+                                        f'Полученные данные:\n'
+                                        f'name      {self.name}\n'
+                                        f'id        {self.user_id}\n'
+                                        f'url       https://vk.com/id{self.user_id}\n'
+                                        f'number    {text}')
 
                 await update_users(self.user_id, self.name, mode='number')
                 # todo добавление в unuser после номера
@@ -217,6 +221,7 @@ class VkUserControl(metaclass=ControlMeta):
         # await self.run_session()
 
     def send_status_tg(self, text):
+        print('отправка')
         self.tg_bot.send_message(settings['user_id'], text)
 
     async def get_user_info(self, user_id):
@@ -234,7 +239,7 @@ class VkUserControl(metaclass=ControlMeta):
         try:
             # return self.vk.friends.get(user_id=user_id)
             res = await self.vk.friends.search(user_id=user_id, fields="sex, city", count=1000)
-            print(res)
+            # print(res)
             return res
         except Exception as e:
             print(f'{e}')
@@ -262,20 +267,21 @@ class VkUserControl(metaclass=ControlMeta):
             # async with session.get(url=req) as response:
             #     pass
 
-    def start_send_message(self, user_id, text, loop):
+    def start_send_message(self, auth_user, text, loop):
         asyncio.set_event_loop(loop)
         # print(asyncio.get_event_loop())
 
         loop = asyncio.get_event_loop()
         # print(loop)
-        loop.run_until_complete(self.thread_send_message(user_id, text, loop))
+        loop.run_until_complete(self.thread_send_message(auth_user, text, loop))
 
-    async def thread_send_message(self, user_id, text, loop):
+    async def thread_send_message(self, auth_user, text, loop):
         # async with TokenSession(self.token) as session:
         async with TokenSession(self.token, driver=HttpDriver(loop=loop)) as session:
             # session =
             vk = API(session)
-            USER_LIST[user_id].block_template += 1
+
+            auth_user.block_template += 1
             # рандомный сон
             delay_response_from, delay_response_to = settings['delay_response_from'], settings['delay_response_to']
 
@@ -284,9 +290,16 @@ class VkUserControl(metaclass=ControlMeta):
 
             await asyncio.sleep(random_sleep_answer)
 
+            # Сон для задержки между сообщениями
+
+            while auth_user.last_answer_time > time.time():
+                # print(f'Жду {settings["delay_between_messages"]} сек')
+                await asyncio.sleep(settings['delay_between_messages'] + 1)
+            auth_user.last_answer_time = time.time() + settings['delay_between_messages']
+
             # todo
             # now = time.time()
-            await vk.messages.setActivity(user_id=user_id, type='typing')
+            await vk.messages.setActivity(user_id=auth_user.user_id, type='typing')
             # print(time.time() - now)
             # await self.vk('messages.set_activity', user_id=user_id, type='typing')#todo
             # now = time.time()
@@ -304,7 +317,7 @@ class VkUserControl(metaclass=ControlMeta):
 
             # await self.sen_message(user_id, text)
 
-            await vk.messages.send(user_id=user_id,
+            await vk.messages.send(user_id=auth_user.user_id,
                                    message=text,
                                    random_id=0)
             # loop.close()
@@ -314,7 +327,7 @@ class VkUserControl(metaclass=ControlMeta):
         #                                       'message': text,
         #                                       'random_id': 0, })
 
-        USER_LIST[user_id].block_template = 0
+        USER_LIST[auth_user.user_id].block_template = 0
 
     async def find_most_city(self, friend_list):
         friends_city = [i['city']['title'] for i in friend_list['items'] if
@@ -406,7 +419,7 @@ class VkUserControl(metaclass=ControlMeta):
                                     # executor = ThreadPoolExecutor(5)
                                     # loop.set_default_executor(executor)
                                     Thread(target=self.start_send_message,
-                                           args=(user, f"{answer} {template}", loop)).start()
+                                           args=(auth_user, f"{answer} {template}", loop)).start()
 
                                 else:
                                     await TextHandler(SIGNS['red'], f"{user} / {name} / Стадия 7 или больше / Игнор",
@@ -486,11 +499,20 @@ class VkUserControl(metaclass=ControlMeta):
                                 current_answer = f"{answer} {template}" if (answer or template) else \
                                     await search_answer('привет', friend_list)
 
-                                await self.sen_message(user, current_answer)
+                                # todo
+                                # await self.sen_message(user, current_answer)
 
                                 check_time_end = round(time.time() - check_time_start, 6)
                                 await TextHandler(SIGNS['time'], f'Время полной проверки {check_time_end} s', 'debug',
                                                   off_interface=True, prop=True)
+
+                                loop = asyncio.new_event_loop()
+                                # loop = asyncio.get_event_loop()
+                                # executor = ThreadPoolExecutor(5)
+                                # loop.set_default_executor(executor)
+                                Thread(target=self.start_send_message,
+                                       args=(auth_user, f"{current_answer}", loop)).start()
+
                                 continue
 
                             # verification_failed(user, name)
@@ -744,8 +766,9 @@ async def upload_all_data_main():
         await TextHandler(SIGNS['mark'], f'Файл {answer4} для черного списка загружен')
 
         await TextHandler(SIGNS['magenta'], 'Проверка прокси:', color='magenta')
-        proxy = settings['proxy']
-        await TextHandler(SIGNS['magenta'], '    PROXY {proxy} IS WORKING'.format(proxy=proxy))
+
+        for proxy in settings['proxy']:
+            await TextHandler(SIGNS['magenta'], '    PROXY {proxy} IS WORKING'.format(proxy=proxy))
 
         # if is_bad_proxy(proxy):
         #     await TextHandler(SIGNS['magenta'], f"    BAD PROXY {proxy}", log_type='error', full=True)
