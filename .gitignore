@@ -6,3 +6,4 @@ __pycache__
 .idea
 tests
 add_utils
+views_json
