@@ -1,58 +1,45 @@
-import inspect
-from pprint import pprint
-
-import telebot
-
-from settings import VERSION, LOG_COLORS, TEXT_HANDLER_CONTROLLER, SIGNS, TextHandler, async_time_track, views, \
-    time_track, TOKENS, settings
-
-if TEXT_HANDLER_CONTROLLER['accept_interface']:
-    from interface.async_main import async_eel, window_update, init_eel
-import threading
-from aiovk import TokenSession, API
-from aiovk.drivers import HttpDriver
-from aiovk.longpoll import UserLongPoll
-from vk_api.vk_api import VkApiMethod
-from database.database import Users, Numbers
 import asyncio
 import datetime
-import json
+import inspect
 import multiprocessing
 import random
 import re
+import threading
+import time
+import urllib.error
+import urllib.request
 from collections import Counter
+from multiprocessing import Process
+from pprint import pprint
+from threading import Thread
 
 import aiohttp
 import pandas as pd
-from multiprocessing import Process
-from threading import Thread
 import requests
-import time
+import telebot
+from aiovk import API, TokenSession
+from aiovk.drivers import HttpDriver
+from aiovk.longpoll import UserLongPoll
+from colorama import init as colorama_init
+from vk_api.longpoll import Event, VkEventType
+from vk_api.vk_api import VkApiMethod
 
-import urllib.request
-import urllib.error
-
-from more_termcolor import colored
-from vk_api.longpoll import VkEventType, Event
-
+from database.database import Numbers, Users
+from interface.async_main import async_eel, init_eel, window_update
 from logs.log_settings import exp_log
-
 from open_data import read_json, read_template
-from colorama import init
-from concurrent.futures import ThreadPoolExecutor
-
-init()
-
-# log = logging.getLogger('VkBot_info')
-# logging.root = logging.getLogger('main')
+from settings import (LOG_COLORS, SIGNS, TEXT_HANDLER_CONTROLLER, TOKENS,
+                      VERSION, TextHandler, async_time_track, settings,
+                      time_track, views)
 
 users = []
 unusers = []
-
 TALK_DICT_ANSWER_ALL = {}
 TALK_TEMPLATE = {}
 USER_STATE = {}
 USER_LIST = {}
+
+colorama_init()
 
 
 @async_time_track
@@ -96,10 +83,29 @@ async def update_users(user_id, name, mode='default', city=None):
         unusers.append(user_id)
 
 
+class ResponseTimeTrack:
+    def __init__(self):
+        self.start_time = time.monotonic()
+
+    async def stop(self):
+        end_time = time.monotonic()
+        check_time_end = round(end_time - self.start_time, 6)
+        await TextHandler(SIGNS['time'], f'Время полной проверки {check_time_end} s', 'debug',
+                          off_interface=True, prop=True)
+
+
 class ControlMeta(type):
     def __new__(mcs, name, bases, attrs, **kwargs):
         pprint(attrs)
+
         for key, val in attrs.items():
+
+            # todo update
+            # match inspect.isfunction(val):
+            #     case '__init__' | 'act' | 'parse_event' | 'start_send_message' | 'send_status_tg':
+            #         pass
+            #     case
+
             if inspect.isfunction(val):
 
                 if key in ('__init__', 'act', 'parse_event', 'start_send_message', 'send_status_tg'):
@@ -292,9 +298,11 @@ class VkUserControl(metaclass=ControlMeta):
 
             # Сон для задержки между сообщениями
 
-            while auth_user.last_answer_time > time.time():
-                # print(f'Жду {settings["delay_between_messages"]} сек')
-                await asyncio.sleep(settings['delay_between_messages'] + 1)
+            # todo доделать last_answer_time
+            # while auth_user.last_answer_time > time.time():
+            #     # print(f'Жду {settings["delay_between_messages"]} сек')
+            #     await asyncio.sleep(settings['delay_between_messages'] + 1)
+
             auth_user.last_answer_time = time.time() + settings['delay_between_messages']
 
             # todo
@@ -391,7 +399,9 @@ class VkUserControl(metaclass=ControlMeta):
                         text = event.text.lower()
                         user = event.user_id
 
-                        check_time_start = time.time()
+                        # check_time_start = time.time()
+                        res_time_track = ResponseTimeTrack()
+
                         if text == 'endthisnow':
                             return
                         if user in unusers:
@@ -424,11 +434,14 @@ class VkUserControl(metaclass=ControlMeta):
                                 else:
                                     await TextHandler(SIGNS['red'], f"{user} / {name} / Стадия 7 или больше / Игнор",
                                                       'error')
-                                check_time_end = round(time.time() - check_time_start, 6)
-                                await TextHandler(SIGNS['time'], f'Время формирования ответа {check_time_end} s',
-                                                  'debug',
-                                                  # todo сделать функцией
-                                                  off_interface=True, prop=True)
+
+                                await res_time_track.stop()
+
+                                # check_time_end = round(time.time() - check_time_start, 6)
+                                # await TextHandler(SIGNS['time'], f'Время формирования ответа {check_time_end} s',
+                                #                   'debug',
+                                #                   # todo сделать функцией
+                                #                   off_interface=True, prop=True)
 
                         else:  # Если нету в базе
                             info = await self.get_user_info(user)
@@ -493,18 +506,26 @@ class VkUserControl(metaclass=ControlMeta):
                                 city = await self.find_most_city(friend_list)
 
                                 auth_user = await update_users(user, name, city=city)
-                                template = await auth_user.act(text, self)
 
+                                template = await auth_user.act(text, self)
                                 answer = await search_answer(text, city)
-                                current_answer = f"{answer} {template}" if (answer or template) else \
-                                    await search_answer('привет', friend_list)
+
+                                current_answer = f"{answer} {template}" if (
+                                        answer or template) else await search_answer('привет', friend_list)
+
+                                # todo update current_answer
+                                # match answer, template:
+                                #     case str(answer)|str(template):
+                                #         print()
 
                                 # todo
                                 # await self.sen_message(user, current_answer)
 
-                                check_time_end = round(time.time() - check_time_start, 6)
-                                await TextHandler(SIGNS['time'], f'Время полной проверки {check_time_end} s', 'debug',
-                                                  off_interface=True, prop=True)
+                                await res_time_track.stop()
+
+                                # check_time_end = round(time.time() - check_time_start, 6)
+                                # await TextHandler(SIGNS['time'], f'Время полной проверки {check_time_end} s', 'debug',
+                                #                   off_interface=True, prop=True)
 
                                 loop = asyncio.new_event_loop()
                                 # loop = asyncio.get_event_loop()
@@ -527,17 +548,35 @@ class VkUserControl(metaclass=ControlMeta):
                 await TextHandler(SIGNS['red'], 'ПЕРЕПОДКЛЮЧЕНИЕ...', 'error')
 
     # def all_validators(self, age, count_friends, friends, male):
-    async def all_validators(self, *args):
-        validators = (await func(value) for func, value in zip(self.validators, args))
-        async for valid in validators:
+    # todo
+    async def all_validators(self, *args) -> bool:
+        validators = (func(value) for func, value in zip(self.validators, args))
+        for valid in validators:
             if not valid:
                 return False
         return True
 
-    async def photo_validator(self, photo):
+    # async def all_validators(self, *args):
+    #        validators = (await func(value) for func, value in zip(self.validators, args))
+    #        async for valid in validators:
+    #            if not valid:
+    #                return False
+    #        return True
+
+    async def photo_validator(self, photo) -> bool:
         validator = views['validators']['photo_validator']
 
         await TextHandler(SIGNS['yellow'], validator['check'], 'warning')
+
+        # todo update
+        # match bool(photo):
+        #     case True:
+        #         await TextHandler(SIGNS['yellow'], validator['success'])
+        #         return True
+        #     case False:
+        #         await TextHandler(SIGNS['red'], validator['failure'], 'error')
+        #         return False
+
         if photo:
             await TextHandler(SIGNS['yellow'], validator['success'])
             return True
@@ -545,7 +584,7 @@ class VkUserControl(metaclass=ControlMeta):
             await TextHandler(SIGNS['red'], validator['failure'], 'error')
             return False
 
-    async def age_validator(self, age):
+    async def age_validator(self, age) -> bool:
         validator = views['validators']['age_validator']
 
         await TextHandler(SIGNS['yellow'], validator['check'], 'warning')
@@ -568,7 +607,7 @@ class VkUserControl(metaclass=ControlMeta):
             exp_log.exception(e)
             return True
 
-    async def count_friends_validator(self, count):
+    async def count_friends_validator(self, count) -> bool:
         validator = views['validators']['count_friends_validator']
 
         await TextHandler(SIGNS['yellow'], validator['check'], 'warning')
@@ -617,6 +656,9 @@ async def search_answer(text, city):  # todo
 
     try:
         for a, b in TALK_DICT_ANSWER_ALL.items():
+
+            # todo update
+
             if a == 'город' or a == 'негород':
                 continue
             # print(a, b)
@@ -722,7 +764,6 @@ yellow_point = LOG_COLORS['warning'][1]
 
 async def upload_all_data_main():
     """Инициализация данных профиля и сохранений в базе"""
-    global TALK_DICT_ANSWER_ALL, TALK_TEMPLATE, USER_STATE
     try:
         if TEXT_HANDLER_CONTROLLER['accept_interface']:
             await async_eel.AddVersion(f"VkBot v{VERSION}")()
@@ -743,16 +784,17 @@ async def upload_all_data_main():
         delay = f"[{settings['delay_typing_from']} - {settings['delay_typing_to']}] s"
         await TextHandler(SIGNS['magenta'], f"    Длительность отображения печати : {delay}", color='cyan')
 
-        TALK_DICT_ANSWER_ALL = read_json()
+        TALK_DICT_ANSWER_ALL.update(read_json())
         answer2 = f"Данные для разговора загружены"
         await TextHandler(SIGNS['mark'], answer2)
 
-        TALK_TEMPLATE = read_template()
+        TALK_TEMPLATE.update(read_template())
         answer1 = 'template.json'
         await TextHandler(SIGNS['mark'], f'Файл {answer1} для шаблонов загружен')
 
         # Выгрузка стадий и юзеров
         await upload_sql_users()
+
         # USER_STATE = read_userstate()
         # upload_user_state(USER_STATE)
         # todo
@@ -819,13 +861,6 @@ async def main(token=None):
     # asyncio.run_coroutine_threadsafe(vk.run_session(), loop)
     # loop.run_forever()
     # asyncio.run(vk.run_session())
-
-
-def main5():
-    upload_all_data_main()
-
-    # run_threads(TOKENS)
-    run_multiproc4()
 
 
 def main2():
