@@ -1,9 +1,10 @@
 *.log
+logs
+tests
 dist1
 build
 *.spec
 __pycache__
 .idea
-tests
 add_utils
 views_json

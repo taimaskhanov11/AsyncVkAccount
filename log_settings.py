@@ -1,11 +1,5 @@
 import logging.config
 import os
-
-# import importlib
-
-# import pkgutil
-# import sys
-
 # LOG_DIR = r'C:\Users\taima\PycharmProjects\vk_acaut\VkBotDir\logs'
 # text = importlib.res('data', 'файл.txt')
 # print(pkgutil.get_data('VkBotDir', 'logs/log_settings.py'))
@@ -14,8 +8,18 @@ import os
 # dirname = os.path.dirname(__file__)
 # filename = os.path.join(dirname, 'relative/path/to/file/you/want')
 # print(__file__)
-LOG_DIR = os.path.dirname(__file__)
-print(LOG_DIR)
+from pathlib import Path
+
+# import importlib
+
+# import pkgutil
+# import sys
+
+
+LOG_DIR = Path(Path(__file__).parent, 'logs')
+# print(LOG_DIR)
+# LOG_DIR = os.path.dirname(__file__)
+# print(LOG_DIR)
 # print(LOG_DIR)
 # print(os.path.basename(__file__))
 # print(os.getcwd())
@@ -29,7 +33,7 @@ log_config = {
             "datefmt": "%Y-%m-%d %H:%M:%S"
         },
         "main_format": {
-            "format": "%(levelname)s:%(asctime)s:%(name)s:%(message)s",
+            "format": "%(levelname)s :%(asctime)s:%(name)s:%(message)s",
             "datefmt": "%Y-%m-%d %H:%M:%S"
         },
         "print_format": {

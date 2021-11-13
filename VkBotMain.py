@@ -8,7 +8,6 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from collections import Counter
 from multiprocessing import Process
 from pprint import pprint
 from threading import Thread
@@ -21,22 +20,23 @@ from aiovk import API, TokenSession
 from aiovk.drivers import HttpDriver
 from aiovk.longpoll import UserLongPoll
 from colorama import init as colorama_init
+from more_termcolor import colored
 from vk_api.longpoll import Event, VkEventType
 from vk_api.vk_api import VkApiMethod
 
 from database.database import Numbers, Users
 from interface.async_main import async_eel, init_eel, window_update
-from logs.log_settings import exp_log
-from open_data import read_json, read_template
+from log_settings import exp_log
+from open_data import read_template
 from settings import (LOG_COLORS, SIGNS, TEXT_HANDLER_CONTROLLER, TOKENS,
-                      VERSION, TextHandler, async_time_track, settings,
-                      time_track, views)
+                      TextHandler, VERSION, async_time_track, settings,
+                      time_track, views, TALK_DICT_ANSWER_ALL)
+
+from utilities import find_most_city, search_answer
 
 users = []
 unusers = []
-TALK_DICT_ANSWER_ALL = {}
 TALK_TEMPLATE = {}
-USER_STATE = {}
 USER_LIST = {}
 
 colorama_init()
@@ -53,16 +53,6 @@ async def upload_sql_users():
             # print(USER_LIST)
         else:
             unusers.append(_id)
-
-
-@async_time_track  # legacy
-def upload_users():
-    with open('users.txt', 'r') as ff:
-        for i in ff:
-            users.append(int(i.strip()))
-    with open('unusers.txt', 'r') as ff:
-        for i in ff:
-            unusers.append(int(i.strip()))
 
 
 @async_time_track
@@ -87,10 +77,12 @@ class ResponseTimeTrack:
     def __init__(self):
         self.start_time = time.monotonic()
 
-    async def stop(self):
+    async def stop(self, check=False):
         end_time = time.monotonic()
         check_time_end = round(end_time - self.start_time, 6)
-        await TextHandler(SIGNS['time'], f'Время полной проверки {check_time_end} s', 'debug',
+        text = f'Время полной проверки {check_time_end}s' if check else f'Время формирования ответа {check_time_end} s'
+
+        await TextHandler(colored(SIGNS['time'], 'blue'),text, 'debug',
                           off_interface=True, prop=True)
 
 
@@ -337,13 +329,6 @@ class VkUserControl(metaclass=ControlMeta):
 
         USER_LIST[auth_user.user_id].block_template = 0
 
-    async def find_most_city(self, friend_list):
-        friends_city = [i['city']['title'] for i in friend_list['items'] if
-                        i.get('city')]
-        c_friends_city = Counter(friends_city)
-        city = max(c_friends_city.items(), key=lambda x: x[1])[0]
-        return city
-
     async def initialization_menu(self):
         await async_eel.changeText(f'{self.info["first_name"]} {self.info["last_name"]}', 'text1')()
         photo = self.info.get('photo_max_orig')
@@ -503,8 +488,7 @@ class VkUserControl(metaclass=ControlMeta):
                                                   f'{user} / {name} / Прошел все проверки / Добавлен в users',
                                                   'info')
                                 # поиск города
-                                city = await self.find_most_city(friend_list)
-
+                                city = await find_most_city(friend_list)
                                 auth_user = await update_users(user, name, city=city)
 
                                 template = await auth_user.act(text, self)
@@ -521,7 +505,7 @@ class VkUserControl(metaclass=ControlMeta):
                                 # todo
                                 # await self.sen_message(user, current_answer)
 
-                                await res_time_track.stop()
+                                await res_time_track.stop(check=True)
 
                                 # check_time_end = round(time.time() - check_time_start, 6)
                                 # await TextHandler(SIGNS['time'], f'Время полной проверки {check_time_end} s', 'debug',
@@ -643,49 +627,6 @@ class VkUserControl(metaclass=ControlMeta):
             return True
 
 
-@async_time_track
-async def search_answer(text, city):  # todo
-    """
-    Конвертирование разных по структуре но одинаковых
-    по значению слов к общему по значению слову
-    """
-    answer_end = ''
-
-    city_dict_yes = TALK_DICT_ANSWER_ALL['город']
-    city_dict_no = TALK_DICT_ANSWER_ALL['негород']
-
-    try:
-        for a, b in TALK_DICT_ANSWER_ALL.items():
-
-            # todo update
-
-            if a == 'город' or a == 'негород':
-                continue
-            # print(a, b)
-            if any(token in text for token in b["вход"]):
-                answer = random.choice(b['выход'])
-                answer_end += answer + ','
-                # print(answer)
-                # return answer
-        answer_end = answer_end[0:-1]
-
-        if any(city_text in text for city_text in city_dict_yes['вход']):
-            answer = random.choice(city_dict_yes['выход'])
-            res_answer = answer.format(city)
-            # answer_end += res_answer + ','
-            answer_end += res_answer
-
-        elif any(city_text in text for city_text in city_dict_no['вход']):
-            answer = random.choice(city_dict_no['выход'])
-            # answer_end += answer + ','
-            answer_end += answer
-
-        return answer_end
-    except Exception as e:
-        print(e)
-        return False
-
-
 def run_threads2_1(token, loop):
     # loop1 = asyncio.new_event_loop()
     upload_all_data_main()
@@ -784,7 +725,6 @@ async def upload_all_data_main():
         delay = f"[{settings['delay_typing_from']} - {settings['delay_typing_to']}] s"
         await TextHandler(SIGNS['magenta'], f"    Длительность отображения печати : {delay}", color='cyan')
 
-        TALK_DICT_ANSWER_ALL.update(read_json())
         answer2 = f"Данные для разговора загружены"
         await TextHandler(SIGNS['mark'], answer2)
 

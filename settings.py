@@ -1,30 +1,23 @@
-import functools
 import inspect
-import json
 import os
-import pathlib
 import time
+from pathlib import Path
 
 from more_termcolor import colored
 
-from logs.log_settings import talk_log, prop_log
+from interface.async_main import interface
+from log_settings import prop_log, talk_log
+from open_data import read_json
 
-set_dir = os.path.join(os.path.dirname(__file__), 'settings.json')
-print(pathlib.Path(__file__).parent)
+BASE_DIR = Path(__file__).parent
 
-with open(set_dir, 'r', encoding='utf-8-sig') as f:
-    settings = json.load(f)
-
-with open('views_json/validators.json', 'r', encoding='utf-8-sig') as f:
-    views = json.load(f)
-
+TALK_DICT_ANSWER_ALL = read_json('config/answers.json')
+settings = read_json('config/settings.json')
+views = read_json('views_json/validators.json')
 
 VERSION = settings['version']
 TEXT_HANDLER_CONTROLLER = settings['text_handler_controller']
 TOKENS = settings['tokens']
-
-if TEXT_HANDLER_CONTROLLER['accept_interface']:
-    from interface.async_main import interface
 
 SIGNS = {
     "red": "✖",
@@ -69,11 +62,11 @@ async def TextHandler(sign, text, log_type='info', color=None, full=False, off_i
 def time_track(func):
     path = os.path.basename(inspect.getsourcefile(func))
 
-    @functools.wraps(func)
+    # @functools.wraps(func)
     def sync_wrapper(*args, **kwargs):
-        now = time.time()
+        now = time.monotonic()
         res = func(*args, **kwargs)
-        end = time.time() - now
+        end = time.monotonic() - now
         execute_time = f'{"Executed time"} {end} s'
         func_name = f'{path}/{func.__name__}'
         # print(func_name)
@@ -88,11 +81,11 @@ def time_track(func):
 def async_time_track(func):
     path = os.path.basename(inspect.getsourcefile(func))
 
-    @functools.wraps(func)
+    # @functools.wraps(func)
     async def async_wrapper(*args, **kwargs):
-        now = time.time()
+        now = time.monotonic()
         res = await func(*args, **kwargs)
-        end = time.time() - now
+        end = time.monotonic() - now
         execute_time = f'{"Executed time"} {end} s'
         func_name = f'{path}/{func.__name__}'
         await TextHandler(SIGNS['time'], f'{func_name:<36} {execute_time}', 'debug',
