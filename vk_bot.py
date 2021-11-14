@@ -20,19 +20,34 @@ from aiovk import API, TokenSession
 from aiovk.drivers import HttpDriver
 from aiovk.longpoll import UserLongPoll
 from colorama import init as colorama_init
+from tqdm import tqdm, trange
 from vk_api.longpoll import Event, VkEventType
 from vk_api.vk_api import VkApiMethod
 
 # from database.database import Numbers, Users
-from database.apostgresql_tortoise_db import Numbers, Users, init_tortoise
+from database.apostgresql_tortoise_db import Input, Numbers, Users, init_tortoise
 from interface.async_main import async_eel, init_eel, window_update
 from log_settings import exp_log, prop_log
-from open_data import read_template
 from settings import (LOG_COLORS, SIGNS, TEXT_HANDLER_CONTROLLER, TOKENS,
-                      TextHandler, VERSION, async_time_track, settings,
+                      text_handler, VERSION, async_time_track, settings,
                       time_track, views, TALK_DICT_ANSWER_ALL, TALK_TEMPLATE)
-
 from utilities import find_most_city, search_answer
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncGenerator,
+    Awaitable,
+    Generator,
+    Generic,
+    Iterator,
+    List,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+)
+# todo
+
 
 users = []
 unusers = []
@@ -52,7 +67,6 @@ async def upload_sql_users():
         else:
             users.append(_id)
             USER_LIST[_id] = User(_id, user.state, user.name, user.city)
-
 
 
 @async_time_track
@@ -82,8 +96,8 @@ class ResponseTimeTrack:
         check_time_end = round(end_time - self.start_time, 6)
         text = f'Время полной проверки {check_time_end}s' if check else f'Время формирования ответа {check_time_end} s'
 
-        await TextHandler(SIGNS['time'], text, 'debug',color= 'blue',
-                          off_interface=True, prop=True)
+        await text_handler(SIGNS['time'], text, 'debug', color='blue',
+                           off_interface=True, prop=True)
 
 
 class ControlMeta(type):
@@ -150,11 +164,11 @@ class User(metaclass=ControlMeta):
             if result:
                 # DONE
                 # self.append_to_exel(self.user_id, text, self.name) #todo
-                await Numbers.create_user(self.user_id, self.name, self.city, text)
+                await Numbers.create(user_id=self.user_id, name=self.name, city=self.city, text=text)
                 if TEXT_HANDLER_CONTROLLER['accept_interface']:
                     await window_update(self.user_id, self.name, text, mode='numbers')
 
-                await TextHandler(SIGNS['mark'], f'{self.user_id} / {self.name} Номер получен добавление в unusers')
+                await text_handler(SIGNS['mark'], f'{self.user_id} / {self.name} Номер получен добавление в unusers')
                 overlord.send_status_tg(f'бот {overlord.info["first_name"]} {overlord.info["last_name"]}\n'
                                         f'Полученные данные:\n'
                                         f'name      {self.name}\n'
@@ -339,15 +353,15 @@ class VkUserControl(metaclass=ControlMeta):
             file = f'{self.info["id"]}.png'
             with open(f'interface/www/media/{file}', 'wb') as ff:
                 ff.write(res)
-            await TextHandler(SIGNS['green'], 'Фото загружено')
+            await text_handler(SIGNS['green'], 'Фото загружено')
             await async_eel.giveAvatar(file)()
 
     async def user_info_view(self, info, friend_list, age, has_photo):
-        await TextHandler(SIGNS['yellow'], f"{info['first_name']}, {info['last_name']}, {info['id']}",
-                          'warning')
-        await TextHandler(SIGNS['yellow'], f"{friend_list['count']} - Количество друзей", 'warning')
-        await TextHandler(SIGNS['yellow'], f'Возраст - {age}', 'warning')
-        await TextHandler(SIGNS['yellow'], f'Фото {has_photo}', 'warning')
+        await text_handler(SIGNS['yellow'], f"{info['first_name']}, {info['last_name']}, {info['id']}",
+                           'warning')
+        await text_handler(SIGNS['yellow'], f"{friend_list['count']} - Количество друзей", 'warning')
+        await text_handler(SIGNS['yellow'], f'Возраст - {age}', 'warning')
+        await text_handler(SIGNS['yellow'], f'Фото {has_photo}', 'warning')
 
     async def get_self_info(self):
         res = await self.vk.users.get(fields=['photo_max_orig'])
@@ -402,8 +416,8 @@ class VkUserControl(metaclass=ControlMeta):
                             return
 
                         if user in unusers:
-                            await TextHandler(SIGNS['red'], f'Новое сообщение от {user} / Черный список / : {text}',
-                                              'error')  # todo
+                            await text_handler(SIGNS['red'], f'Новое сообщение от {user} / Черный список / : {text}',
+                                               'error')  # todo
                             continue
 
                         elif user in users:
@@ -412,10 +426,11 @@ class VkUserControl(metaclass=ControlMeta):
                                 name = auth_user.name
                                 city = auth_user.city
 
-                                await TextHandler(SIGNS['green'], f'Новое сообщение от {name} / {user} - {text}',
-                                                  'info')  # todo
+                                await text_handler(SIGNS['green'], f'Новое сообщение от {name} / {user} - {text}',
+                                                   'info')  # todo
 
-                                answer = await search_answer(text, city)
+                                # answer = await search_answer(text, city) #todo
+                                answer = await Input.find_output(text, city)
                                 template = await auth_user.act(text, self)  # todo
 
                                 # Сохранение состояния в файл
@@ -431,8 +446,8 @@ class VkUserControl(metaclass=ControlMeta):
                                     task.start()
 
                                 else:
-                                    await TextHandler(SIGNS['red'], f"{user} / {name} / Стадия 7 или больше / Игнор",
-                                                      'error')
+                                    await text_handler(SIGNS['red'], f"{user} / {name} / Стадия 7 или больше / Игнор",
+                                                       'error')
 
                                 await res_time_track.stop()
 
@@ -446,13 +461,13 @@ class VkUserControl(metaclass=ControlMeta):
                             info = await self.get_user_info(user)
                             # print(info)
                             name = info['first_name']
-                            await TextHandler(SIGNS['yellow'],
-                                              f'Новое сообщение от {name} / {user} / Нету в базе - {text}',
-                                              'warning')
+                            await text_handler(SIGNS['yellow'],
+                                               f'Новое сообщение от {name} / {user} / Нету в базе - {text}',
+                                               'warning')
 
                             closed = info["can_access_closed"]
                             add_status = await self.check_status_friend(user)
-                            await TextHandler(SIGNS['yellow'], f"Статус дружбы {add_status}", 'warning')
+                            await text_handler(SIGNS['yellow'], f"Статус дружбы {add_status}", 'warning')
 
                             if not closed:
                                 if add_status == 0:
@@ -468,7 +483,7 @@ class VkUserControl(metaclass=ControlMeta):
                                     continue
 
                                 elif add_status == 2:
-                                    await TextHandler(SIGNS['yellow'], f"Добавление в друзья", 'warning')
+                                    await text_handler(SIGNS['yellow'], f"Добавление в друзья", 'warning')
                                     await self.add_friend(user)
 
                                 elif add_status == 1:
@@ -477,7 +492,7 @@ class VkUserControl(metaclass=ControlMeta):
                                     continue
 
                             if add_status == 2:
-                                await TextHandler(SIGNS['yellow'], f"Добавление в друзья", 'warning')
+                                await text_handler(SIGNS['yellow'], f"Добавление в друзья", 'warning')
                                 await self.add_friend(user)
 
                             friend_list = await self.get_friend(user)
@@ -498,15 +513,16 @@ class VkUserControl(metaclass=ControlMeta):
                             # if self.age_validator(age) and self.count_friends_validator(count_friend) and has_photo:
                             if valid:
                                 # todo выбрать между много проц поточ и одним
-                                await TextHandler(SIGNS['mark'],
-                                                  f'{user} / {name} / Прошел все проверки / Добавлен в users',
-                                                  'info')
+                                await text_handler(SIGNS['mark'],
+                                                   f'{user} / {name} / Прошел все проверки / Добавлен в users',
+                                                   'info')
                                 # поиск города
                                 city = await find_most_city(friend_list)
                                 auth_user = await update_users(user, name, city=city)
 
                                 template = await auth_user.act(text, self)
-                                answer = await search_answer(text, city)
+                                # answer = await search_answer(text, city)
+                                answer =  await Input.find_output(text, city)
 
                                 current_answer = f"{answer} {template}" if (
                                         answer or template) else await search_answer('привет', friend_list)
@@ -538,15 +554,15 @@ class VkUserControl(metaclass=ControlMeta):
 
                             # verification_failed(user, name)
 
-                            await TextHandler(SIGNS['red'], f'{user} {name} Проверку не прошел / Добавлен в unusers',
-                                              'error')
+                            await text_handler(SIGNS['red'], f'{user} {name} Проверку не прошел / Добавлен в unusers',
+                                               'error')
                             await update_users(user, name, False)
 
             except Exception as e:
                 # raise
                 exp_log.exception(e)
                 print('ПЕРЕПОДКЛЮЧЕНИЕ...')  # todo
-                await TextHandler(SIGNS['red'], 'ПЕРЕПОДКЛЮЧЕНИЕ...', 'error')
+                await text_handler(SIGNS['red'], 'ПЕРЕПОДКЛЮЧЕНИЕ...', 'error')
 
     # def all_validators(self, age, count_friends, friends, male):
     # todo
@@ -567,7 +583,7 @@ class VkUserControl(metaclass=ControlMeta):
     async def photo_validator(self, photo) -> bool:
         validator = views['validators']['photo_validator']
 
-        await TextHandler(SIGNS['yellow'], validator['check'], 'warning')
+        await text_handler(SIGNS['yellow'], validator['check'], 'warning')
 
         # todo update
         # match bool(photo):
@@ -579,16 +595,16 @@ class VkUserControl(metaclass=ControlMeta):
         #         return False
 
         if photo:
-            await TextHandler(SIGNS['yellow'], validator['success'])
+            await text_handler(SIGNS['yellow'], validator['success'])
             return True
         else:
-            await TextHandler(SIGNS['red'], validator['failure'], 'error')
+            await text_handler(SIGNS['red'], validator['failure'], 'error')
             return False
 
-    async def age_validator(self, age) -> bool:
+    async def age_validator(self, age: str | int) -> bool:
         validator = views['validators']['age_validator']
 
-        await TextHandler(SIGNS['yellow'], validator['check'], 'warning')
+        await text_handler(SIGNS['yellow'], validator['check'], 'warning')
         try:
             if age:
                 # print(age)
@@ -597,10 +613,10 @@ class VkUserControl(metaclass=ControlMeta):
                 # print(age)
                 date = 2021 - int(age)
                 if date >= 20:
-                    await TextHandler(SIGNS['green'], validator['success'])
+                    await text_handler(SIGNS['green'], validator['success'])
                     return True
                 else:
-                    await TextHandler(SIGNS['red'], validator['failure'], 'error')
+                    await text_handler(SIGNS['red'], validator['failure'], 'error')
                     return False
             else:
                 return True  # todo
@@ -608,19 +624,19 @@ class VkUserControl(metaclass=ControlMeta):
             exp_log.exception(e)
             return True
 
-    async def count_friends_validator(self, count) -> bool:
+    async def count_friends_validator(self, count: int) -> bool:
         validator = views['validators']['count_friends_validator']
 
-        await TextHandler(SIGNS['yellow'], validator['check'], 'warning')
+        await text_handler(SIGNS['yellow'], validator['check'], 'warning')
         # count = session.method('status.get', {'user_id': user_id})
         if 24 <= count <= 1001:
-            await TextHandler(SIGNS['green'], validator['success'])
+            await text_handler(SIGNS['green'], validator['success'])
             return True
         else:
-            await TextHandler(SIGNS['red'], validator['failure'], 'error')
+            await text_handler(SIGNS['red'], validator['failure'], 'error')
             return False
 
-    async def mens_validator(self, info) -> bool:
+    async def mens_validator(self, info: tuple) -> bool:
         validator = views['validators']['mens_validator']
         """
         Проверка соотношения м/ж
@@ -632,60 +648,16 @@ class VkUserControl(metaclass=ControlMeta):
             :rtype: bool
         """
         male, female, friends = info
-        await TextHandler(SIGNS['yellow'], f' девушек - {female}', 'warning', )
-        await TextHandler(SIGNS['yellow'], f'Количество парней - {male}', 'warning', )
-        await TextHandler(SIGNS['yellow'], validator['check'], 'warning', )
+        await text_handler(SIGNS['yellow'], f' девушек - {female}', 'warning', )
+        await text_handler(SIGNS['yellow'], f'Количество парней - {male}', 'warning', )
+        await text_handler(SIGNS['yellow'], validator['check'], 'warning', )
         res = male / friends * 100
         if round(res) <= 35:
-            await TextHandler(SIGNS['red'], validator['failure'], 'error')
+            await text_handler(SIGNS['red'], validator['failure'], 'error')
             return False
         else:
-            await TextHandler(SIGNS['yellow'], validator['success'].format(res))
+            await text_handler(SIGNS['yellow'], validator['success'].format(res))
             return True
-
-
-def run_threads2_1(token, loop):
-    # loop1 = asyncio.new_event_loop()
-    upload_all_data_main()
-    asyncio.set_event_loop(loop)
-    # asyncio.get_event_loop()
-    vk = VkUserControl(token, loop=loop)
-    # loop1.create_task(vk.run_session())
-    # loop1.run_forever()
-    loop.run_until_complete(vk.run_session())
-
-
-def run_threads2(data):
-    print(data)
-    # print(sys.prefix)
-    # print(multiprocessing.current_process())
-    workers = []
-    for i in data:
-        loop = asyncio.new_event_loop()
-        # workers.append(Thread(target=run_threads2_1, args=(i, loop)))
-        workers.append(VkUserControl(i, loop))
-    print(workers)
-    for i in workers:
-        i.start()
-    for i in workers:
-        i.join()
-
-
-def split_list(a_list):
-    half = len(a_list) // 2
-    return a_list[:half], a_list[half:]
-
-
-def run_multiproc4():
-    data = split_list(TOKENS)
-    print(f'Выгружены данные токенов в количестве {len(TOKENS)}\n'
-          f'Начинаю запуск бота в двухпроцессорном режиме')
-    for i in TOKENS:
-        print(i)
-    # окго для контроля #todo
-    worker = [Process(target=run_threads2, args=(i,)) for i in data]
-    for i in worker:
-        i.start()
 
 
 def is_bad_proxy(pip):
@@ -705,13 +677,6 @@ def is_bad_proxy(pip):
     return False
 
 
-def upload_user_state(res):
-    global USER_LIST
-    USER_LIST = {}
-    for key, value in res.items():
-        USER_LIST[int(key)] = User(int(key), value['state'], value['name'], value['city'])
-
-
 red_point = LOG_COLORS['error'][1]
 green_point = LOG_COLORS['info'][1]
 yellow_point = LOG_COLORS['warning'][1]
@@ -720,56 +685,50 @@ yellow_point = LOG_COLORS['warning'][1]
 # sign #todo
 
 
-async def upload_all_data_main():
+async def upload_all_data_main(statusbar=True):
     """Инициализация данных профиля и сохранений в базе"""
     try:
         if TEXT_HANDLER_CONTROLLER['accept_interface']:
             await async_eel.AddVersion(f"VkBot v{VERSION}")()
         # cprint("VkBotDir 1.6.3.1", 'bright yellow')
-        await TextHandler(f"VkBot v{VERSION}", '', color='blue')
+        await text_handler(f"VkBot v{VERSION}", '', color='blue')
 
         await init_tortoise()
 
-        answer = 'config.json5'
-
-        await TextHandler(SIGNS['green'], f'Конфигурационный файл  {answer} для токенов загружен:')
-        await TextHandler(SIGNS['mark'], f'Данные токенов загружены:')
-        await TextHandler(SIGNS['magenta'], f'Загруженно токенов {len(TOKENS)}: ', color='magenta')
+        await text_handler(SIGNS['magenta'], f'Загруженно токенов {len(TOKENS)}: ', color='magenta')
         for a, b in enumerate(TOKENS, 1):
-            await TextHandler(SIGNS['magenta'], f"    {b}", color='magenta')
+            await text_handler(SIGNS['magenta'], f"    {b}", color='magenta')
 
-        await TextHandler(SIGNS['mark'], f'Данные для задержки загружены:')
         delay = f"[{settings['delay_response_from']} - {settings['delay_response_to']}] s"
-        await TextHandler(SIGNS['magenta'], f"    Задержка перед ответом : {delay}", color='cyan')
+        await text_handler(SIGNS['magenta'], f"    Задержка перед ответом : {delay}", color='cyan')
         delay = f"[{settings['delay_typing_from']} - {settings['delay_typing_to']}] s"
-        await TextHandler(SIGNS['magenta'], f"    Длительность отображения печати : {delay}", color='cyan')
+        await text_handler(SIGNS['magenta'], f"    Длительность отображения печати : {delay}", color='cyan')
 
         answer2 = f"Данные для разговора загружены"
-        await TextHandler(SIGNS['mark'], answer2)
+        await text_handler(SIGNS['mark'], answer2)
 
         answer1 = 'template.json'
-        await TextHandler(SIGNS['mark'], f'Файл {answer1} для шаблонов загружен')
+        await text_handler(SIGNS['mark'], f'Файл {answer1} для шаблонов загружен')
 
         # Выгрузка стадий и юзеров
-
         await upload_sql_users()
 
-        # USER_STATE = read_userstate()
-        # upload_user_state(USER_STATE)
         # todo
-
         answer2 = 'userstate.json'
-        await TextHandler(SIGNS['mark'], f'Файл {answer2} для этапов ИИ загружен')
-
-        answer3 = 'users.txt'
-        await TextHandler(SIGNS['mark'], f'Файл {answer3} для белого списка загружен')
-        answer4 = 'unusers.txt'
-        await TextHandler(SIGNS['mark'], f'Файл {answer4} для черного списка загружен')
-
-        await TextHandler(SIGNS['magenta'], 'Проверка прокси:', color='magenta')
-
+        await text_handler(SIGNS['mark'], f'Файл {answer2} для этапов ИИ загружен')
+        await text_handler(SIGNS['magenta'], 'Проверка прокси:', color='magenta')
         for proxy in settings['proxy']:
-            await TextHandler(SIGNS['magenta'], '    PROXY {proxy} IS WORKING'.format(proxy=proxy))
+            await text_handler(SIGNS['magenta'], '    PROXY {proxy} IS WORKING'.format(proxy=proxy))
+        time.sleep(1)
+
+        if statusbar:
+            for i in trange(300, colour='green', smoothing=0.1,unit_scale=True):
+                time.sleep(0.001)
+
+        # with tqdm(total=100, colour='green') as pbar:
+        #     for i in range(100):
+        #         time.sleep(0.1)
+        #         pbar.update(0.1)
 
         # if is_bad_proxy(proxy):
         #     await TextHandler(SIGNS['magenta'], f"    BAD PROXY {proxy}", log_type='error', full=True)
@@ -777,126 +736,3 @@ async def upload_all_data_main():
         #     await TextHandler(SIGNS['magenta'], '    PROXY {proxy} IS WORKING')
     except Exception as e:
         exp_log.exception(e)
-
-
-def two_thread_loop():
-    import asyncio
-    from threading import Thread
-
-    def hello(thread_name):
-        print('hello from thread {}!'.format(thread_name))
-
-    event_loop_a = asyncio.new_event_loop()
-    event_loop_b = asyncio.new_event_loop()
-
-    def callback_a():
-        asyncio.set_event_loop(event_loop_a)
-        asyncio.get_event_loop().call_soon(lambda: hello('a'))
-        event_loop_a.run_forever()
-
-    def callback_b():
-        asyncio.set_event_loop(event_loop_b)
-        asyncio.get_event_loop().call_soon(lambda: hello('b'))
-        event_loop_b.run_forever()
-
-    thread_a = Thread(target=callback_a, daemon=True)
-    thread_b = Thread(target=callback_b, daemon=True)
-    thread_a.start()
-    thread_b.start()
-
-
-async def main(token=None):
-    if TEXT_HANDLER_CONTROLLER['accept_interface']:
-        await init_eel()
-    await upload_all_data_main()
-    # run_threads(TOKENS)  # todo
-    #
-
-    vk = VkUserControl(token or TOKENS[0])
-    await vk.run_session()
-    # loop = asyncio.get_event_loop()
-    # loop.run_until_complete(vk.run_session())
-
-    # asyncio.run_coroutine_threadsafe(vk.run_session(), loop)
-    # loop.run_forever()
-    # asyncio.run(vk.run_session())
-
-
-def main2():
-    two_thread_loop()
-
-
-def main3(loop1):
-    # loop1 = asyncio.new_event_loop()
-    upload_all_data_main()
-    asyncio.set_event_loop(loop1)
-    asyncio.get_event_loop()
-    vk = VkUserControl(TOKENS[0], loop=loop1)
-    # loop1.create_task(vk.run_session())
-    # loop1.run_forever()
-    loop1.run_until_complete(vk.run_session())
-
-
-def main4(loop2):
-    # loop2 = asyncio.new_event_loop()
-    upload_all_data_main()
-    asyncio.set_event_loop(loop2)
-    asyncio.get_event_loop()
-    vk = VkUserControl(TOKENS[0], loop=loop2)
-    # loop2.create_task(vk.run_session())
-    # loop2.run_forever()
-    loop2.run_until_complete(vk.run_session())
-
-
-def many_loops():
-    loop1 = asyncio.new_event_loop()
-    loop2 = asyncio.new_event_loop()
-    thread_a = Thread(target=main3, args=(loop1,))
-    thread_b = Thread(target=main4, args=(loop2,))
-    thread_a.start()
-    thread_b.start()
-    thread_a.join()
-    thread_b.join()
-
-
-def start(token=None):
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main(token))
-
-    # asyncio.run(main(token))
-
-
-def multi_main():
-    # token1 = '9e9a3ac3f141f84ea7ace8d0759465097b32928480d7bf952536b8e334f0f48c85a8f0347564cbdd3a387'
-    # token2 = '3a1ef0834325b306e8390699bbd0b781c9fd83b385a1b837df67c77043e6a5f34ff656683cea10157b783'
-    for token in TOKENS:
-        Process(target=start, args=(token,)).start()
-    # Process(target=start).start()
-
-
-if __name__ == '__main__':
-    # asyncio.run(main())
-    # multiprocessing.freeze_support()
-    multi_main()
-    # main()
-    # Thread(target=scr).start()  # todo #ph
-    # Thread(target=send_keyboard).start()  # todo #key
-
-# todo добавить мультипроцессорность
-
-# todo добавить прокси
-# todo добавить для каждого пользователя класс с выгрузкой основных методов при первом запустке
-
-# todo добавить отображение в консоли блока если
-
-# todo тесты
-# todo убрать ошибку со скрином
-
-# todo запись общения в файл write_in_file
-
-# todo писать сообщения
-# todo добавить многопроцессорность
-# todo соединят и отпавлять как одно
-# todo вынести весь текст в отдельный файл
-# todo класс мета для декораторов
-# todo доработать мультипроцессорность

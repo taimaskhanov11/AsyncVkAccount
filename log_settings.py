@@ -1,29 +1,8 @@
 import logging.config
-import os
-# LOG_DIR = r'C:\Users\taima\PycharmProjects\vk_acaut\VkBotDir\logs'
-# text = importlib.res('data', 'файл.txt')
-# print(pkgutil.get_data('VkBotDir', 'logs/log_settings.py'))
-# print(os.path.abspath('log_settings.py'))
-# import os
-# dirname = os.path.dirname(__file__)
-# filename = os.path.join(dirname, 'relative/path/to/file/you/want')
-# print(__file__)
+
 from pathlib import Path
 
-# import importlib
-
-# import pkgutil
-# import sys
-
-
 LOG_DIR = Path(Path(__file__).parent, 'logs')
-# print(LOG_DIR)
-# LOG_DIR = os.path.dirname(__file__)
-# print(LOG_DIR)
-# print(LOG_DIR)
-# print(os.path.basename(__file__))
-# print(os.getcwd())
-
 
 log_config = {
     "version": 1,
@@ -122,25 +101,7 @@ log_config = {
     },
 }
 
-# root_logger = logging.getLogger()
-# root_logger.setLevel(logging.DEBUG)  # or whatever
-# handler = logging.FileHandler('logs/main.log', 'a+', 'utf-8')  # or whatever
-# formatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s %(name)s', "%Y-%m-%d %H:%M:%S")
-# handler.setFormatter(formatter)
-# root_logger.addHandler(handler)
-
-
-# logging.basicConfig(level=logging.DEBUG, filename='logs/main.log', )
-
 logging.config.dictConfig(log_config)
 exp_log = logging.getLogger('VkBot_errors')
 talk_log = logging.getLogger('VkBot_talk')
 prop_log = logging.getLogger('property')
-# logging.root = logging.getLogger('main')
-# logging.root = logging.getLogger('__name__')
-
-# log.setLevel(logging.DEBUG)
-# fh = logging.FileHandler('logs/VkBot_info.log')
-# formatter = logging.Formatter('%(levelname)s %(asctime)s   %(name)s  %(message)s')
-# fh.setFormatter(formatter)
-# log.addHandler(fh)
