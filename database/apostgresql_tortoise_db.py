@@ -149,18 +149,18 @@ class Users(Model):
 
 @async_time_track
 async def init_tortoise():
-    # await Tortoise.init( #todo
-    #     db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
-    #     modules={'models': ['database.apostgresql_tortoise_db']}
-    # )
-    # await Tortoise.init( #todo
-    #     db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
-    #     modules={'models': ['database.apostgresql_tortoise_db']}
-    # )
-    await Tortoise.init(
-        db_url='postgres://bcuoknoutrikhk:94fd296ff056160bf19a70efd4f9b855d4b8a0b50ad1902156735414563252de@localhost:5432/d9gvn77ajkr6cp',
+    await Tortoise.init( #todo
+        db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
         modules={'models': ['database.apostgresql_tortoise_db']}
     )
+    # await Tortoise.init( #todo
+    #     db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
+    #     modules={'models': ['database.apostgresql_tortoise_db']}
+    # )
+    # await Tortoise.init(
+    #     db_url='postgres://bcuoknoutrikhk:94fd296ff056160bf19a70efd4f9b855d4b8a0b50ad1902156735414563252de@localhost:5432/d9gvn77ajkr6cp',
+    #     modules={'models': ['database.apostgresql_tortoise_db']}
+    # )
 
     # await Tortoise.generate_schemas()
 
