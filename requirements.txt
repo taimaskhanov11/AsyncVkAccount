@@ -9,7 +9,7 @@ aiovk~=4.0.0
 amqp==5.0.6
 async-cache==1.1.1
 async-Eel==1.0b4
-async-timeout==4.0.1
+async-timeout==4.0.0
 asyncmock==0.4.2
 asyncpg==0.24.0
 atlastk==0.12.11
