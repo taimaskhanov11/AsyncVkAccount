@@ -20,23 +20,22 @@ from aiovk import API, TokenSession
 from aiovk.drivers import HttpDriver
 from aiovk.longpoll import UserLongPoll
 from colorama import init as colorama_init
-from more_termcolor import colored
 from vk_api.longpoll import Event, VkEventType
 from vk_api.vk_api import VkApiMethod
 
-from database.database import Numbers, Users
+# from database.database import Numbers, Users
+from database.apostgresql_tortoise_db import Numbers, Users, init_tortoise
 from interface.async_main import async_eel, init_eel, window_update
-from log_settings import exp_log
+from log_settings import exp_log, prop_log
 from open_data import read_template
 from settings import (LOG_COLORS, SIGNS, TEXT_HANDLER_CONTROLLER, TOKENS,
                       TextHandler, VERSION, async_time_track, settings,
-                      time_track, views, TALK_DICT_ANSWER_ALL)
+                      time_track, views, TALK_DICT_ANSWER_ALL, TALK_TEMPLATE)
 
 from utilities import find_most_city, search_answer
 
 users = []
 unusers = []
-TALK_TEMPLATE = {}
 USER_LIST = {}
 
 colorama_init()
@@ -44,15 +43,16 @@ colorama_init()
 
 @async_time_track
 async def upload_sql_users():
-    # global USER_LIST
-    for user in Users.select():
+    users_all = await Users.all()
+    for user in users_all:
         _id = user.user_id
-        if user.type:
-            users.append(_id)
-            USER_LIST[_id] = User(_id, user.state, user.name, user.city)
+        if user.blocked:
+            unusers.append(_id)
             # print(USER_LIST)
         else:
-            unusers.append(_id)
+            users.append(_id)
+            USER_LIST[_id] = User(_id, user.state, user.name, user.city)
+
 
 
 @async_time_track
@@ -63,9 +63,9 @@ async def update_users(user_id, name, mode='default', city=None):
     if mode:
         if mode == 'number':
             unusers.append(user_id)
-            await Users.change_value(user_id, 'type', False)
+            await Users.change_value(user_id, 'blocked', True)
         else:
-            await Users.create_user(user_id, name, city, 1)
+            await Users.create(user_id=user_id, name=name, city=city, blocked=False)
             USER_LIST[user_id] = User(user_id, 1, name, city)
             users.append(user_id)
             return USER_LIST[user_id]
@@ -82,14 +82,13 @@ class ResponseTimeTrack:
         check_time_end = round(end_time - self.start_time, 6)
         text = f'Время полной проверки {check_time_end}s' if check else f'Время формирования ответа {check_time_end} s'
 
-        await TextHandler(colored(SIGNS['time'], 'blue'),text, 'debug',
+        await TextHandler(SIGNS['time'], text, 'debug',color= 'blue',
                           off_interface=True, prop=True)
 
 
 class ControlMeta(type):
     def __new__(mcs, name, bases, attrs, **kwargs):
-        pprint(attrs)
-
+        # pprint(attrs)
         for key, val in attrs.items():
 
             # todo update
@@ -104,11 +103,10 @@ class ControlMeta(type):
                     continue
                 # print(val)
                 if asyncio.iscoroutinefunction(val):
-                    print('async', val)
+                    prop_log.debug(f'async {val}')
                     attrs[key] = async_time_track(val)
                 else:
-                    print('sync', val)
-
+                    prop_log.debug(f'sync {val}')
                     attrs[key] = time_track(val)
         return super().__new__(mcs, name, bases, attrs, **kwargs)
 
@@ -210,6 +208,9 @@ class VkUserControl(metaclass=ControlMeta):
         self.validators = (self.photo_validator, self.age_validator, self.count_friends_validator, self.mens_validator,)
         self.DEFAULT_EVENT_CLASS = Event
         self.info = None
+        self.block_message_count = 2
+        self.signal_end = False
+        self.message_threads = []
 
     def run(self):
         # print('Текущий поток', multiprocessing.current_process(), threading.current_thread())#todo
@@ -265,11 +266,12 @@ class VkUserControl(metaclass=ControlMeta):
             # async with session.get(url=req) as response:
             #     pass
 
-    def start_send_message(self, auth_user, text, loop):
+    def start_send_message(self, auth_user, text):
+        loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         # print(asyncio.get_event_loop())
 
-        loop = asyncio.get_event_loop()
+        # loop = asyncio.get_event_loop()
         # print(loop)
         loop.run_until_complete(self.thread_send_message(auth_user, text, loop))
 
@@ -367,8 +369,15 @@ class VkUserControl(metaclass=ControlMeta):
         # await asyncio.sleep(1)
         print(threading.current_thread())
         print(self.loop)
+        print(asyncio.get_event_loop())
+        # print(asyncio.new_event_loop())
         # print(self.parse_event.__name__, 'parse_event')
         # print(self.get_self_info.__name__,  'get_self_info')
+        # await init_tortoise()
+        # await Tortoise.init(
+        #     db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
+        #     modules={'models': ['database.apostgresql_tortoise_db']}
+        # )
         await self.get_self_info()
         if TEXT_HANDLER_CONTROLLER['accept_interface']:
             await self.initialization_menu()
@@ -376,7 +385,7 @@ class VkUserControl(metaclass=ControlMeta):
         while True:
             try:
                 async for event_a in self.longpoll.iter():
-                    # print(event_a['type'])
+                    # print(event_a)
                     if event_a[0] != 4:
                         continue
                     event = self.parse_event(event_a)
@@ -387,8 +396,11 @@ class VkUserControl(metaclass=ControlMeta):
                         # check_time_start = time.time()
                         res_time_track = ResponseTimeTrack()
 
-                        if text == 'endthisnow':
+                        if self.signal_end:
+                            for task in self.message_threads:
+                                task.join()
                             return
+
                         if user in unusers:
                             await TextHandler(SIGNS['red'], f'Новое сообщение от {user} / Черный список / : {text}',
                                               'error')  # todo
@@ -396,7 +408,7 @@ class VkUserControl(metaclass=ControlMeta):
 
                         elif user in users:
                             auth_user = USER_LIST[user]
-                            if auth_user.block_template < 2:
+                            if auth_user.block_template < self.block_message_count:
                                 name = auth_user.name
                                 city = auth_user.city
 
@@ -409,12 +421,14 @@ class VkUserControl(metaclass=ControlMeta):
                                 # Сохранение состояния в файл
                                 if template:
                                     # await self.thread_send_message(user, f"{answer} {template}")
-                                    loop = asyncio.new_event_loop()
+                                    # loop = asyncio.new_event_loop()
                                     # loop = asyncio.get_event_loop()
                                     # executor = ThreadPoolExecutor(5)
                                     # loop.set_default_executor(executor)
-                                    Thread(target=self.start_send_message,
-                                           args=(auth_user, f"{answer} {template}", loop)).start()
+                                    task = Thread(target=self.start_send_message,
+                                                  args=(auth_user, f"{answer} {template}"))
+                                    self.message_threads.append(task)
+                                    task.start()
 
                                 else:
                                     await TextHandler(SIGNS['red'], f"{user} / {name} / Стадия 7 или больше / Игнор",
@@ -511,16 +525,19 @@ class VkUserControl(metaclass=ControlMeta):
                                 # await TextHandler(SIGNS['time'], f'Время полной проверки {check_time_end} s', 'debug',
                                 #                   off_interface=True, prop=True)
 
-                                loop = asyncio.new_event_loop()
+                                # loop = asyncio.new_event_loop()
                                 # loop = asyncio.get_event_loop()
                                 # executor = ThreadPoolExecutor(5)
                                 # loop.set_default_executor(executor)
-                                Thread(target=self.start_send_message,
-                                       args=(auth_user, f"{current_answer}", loop)).start()
 
+                                task = Thread(target=self.start_send_message,
+                                              args=(auth_user, f"{current_answer}"))
+                                self.message_threads.append(task)
+                                task.start()
                                 continue
 
                             # verification_failed(user, name)
+
                             await TextHandler(SIGNS['red'], f'{user} {name} Проверку не прошел / Добавлен в unusers',
                                               'error')
                             await update_users(user, name, False)
@@ -534,8 +551,8 @@ class VkUserControl(metaclass=ControlMeta):
     # def all_validators(self, age, count_friends, friends, male):
     # todo
     async def all_validators(self, *args) -> bool:
-        validators = (func(value) for func, value in zip(self.validators, args))
-        for valid in validators:
+        validators = (await func(value) for func, value in zip(self.validators, args))
+        async for valid in validators:
             if not valid:
                 return False
         return True
@@ -711,6 +728,8 @@ async def upload_all_data_main():
         # cprint("VkBotDir 1.6.3.1", 'bright yellow')
         await TextHandler(f"VkBot v{VERSION}", '', color='blue')
 
+        await init_tortoise()
+
         answer = 'config.json5'
 
         await TextHandler(SIGNS['green'], f'Конфигурационный файл  {answer} для токенов загружен:')
@@ -728,11 +747,11 @@ async def upload_all_data_main():
         answer2 = f"Данные для разговора загружены"
         await TextHandler(SIGNS['mark'], answer2)
 
-        TALK_TEMPLATE.update(read_template())
         answer1 = 'template.json'
         await TextHandler(SIGNS['mark'], f'Файл {answer1} для шаблонов загружен')
 
         # Выгрузка стадий и юзеров
+
         await upload_sql_users()
 
         # USER_STATE = read_userstate()

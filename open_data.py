@@ -1,101 +1,24 @@
+import json
 import time
+from pathlib import Path
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename
-import json
 
 # filename = r'C:\Users\taima\PycharmProjects\vk_account\main\tokens_data.txt'
 import json5
 
+BASE_DIR = Path(__file__).parent
 
-def read_file2():
-    print('Укажите Data file')
-    # Tk().withdraw()  # we don't want a full GUI, so keep the root window from appearing
-    # filename = askopenfilename()  # show an "Open" dialog box and return the path to the selected file
-    token = []
-    bd_login = ''
-    bd_password = ''
-    admin = []
-
-    with open('tests/tokens_data.txt', 'r', newline='') as ff:
-        mode = False
-        for i in ff:
-            i = i.strip()
-            if not i:
-                continue
-
-            elif mode == 'database':
-                bd_login = i
-                mode = 'database1'
-
-            elif mode == 'database1':
-                bd_password = i
-                mode = "admin"
-
-            elif i == 'admin':
-                mode = 'admin'
-
-            elif mode == 'admin':
-                admin.append(i)
-
-            elif i == 'database':
-                mode = 'database'
-
-            if not mode:
-                token.append(i)
-
-    return {'tokens': token,
-            "bd_login": bd_login,
-            "bd_password": bd_password,
-            "admin": admin}
-
-
-def read_file():
-    # print('Укажите Data file')
-    # Tk().withdraw()  # we don't want a full GUI, so keep the root window from appearing
-    # filename = askopenfilename()  # show an "Open" dialog box and return the path to the selected file
-    token = []
-    bd_login = ''
-    bd_password = ''
-    admin = []
-
-    with open('tests/tokens_data.txt', 'r', newline='') as ff:
-        mode = False
-        for i in ff:
-            i = i.strip()
-            if not i:
-                continue
-            token.append(i)
-    return {'tokens': token}
-
-
-def read_config():
-    with open('config.json5', 'r', encoding='utf-8-sig') as ff:
-        return json5.load(ff)
-
-
-# print(read_file())
-
-
-# coding:utf8
-
-
-# with open('myjson.json', 'w', encoding='utf8') as ff:
-#     json.dump(TALK_DICT_ANSWER_ALL, ff, indent=4, ensure_ascii=False)
-
-def read_json():
-    # print('Укажите json файл для общения')
-    # Tk().withdraw()  # we don't want a full GUI, so keep the root window from appearing
-    # filename = askopenfilename()  # show an "Open" dialog box and return the path to the selected file
-    with open('answers.json', 'r', encoding='utf-8-sig') as ff:
-        a = json.load(ff)
-    return a
-
+def read_json(path, encoding='utf-8-sig'):
+    # with open('config/answers.json', 'r', encoding='utf-8-sig') as ff:
+    with open(Path(BASE_DIR, path), 'r', encoding=encoding) as ff:
+        return json.load(ff)
 
 def read_template():
     # print('Укажите json файл для шаблонов')
     # Tk().withdraw()  # we don't want a full GUI, so keep the root window from appearing
     # filename = askopenfilename()  # show an "Open" dialog box and return the path to the selected file
-    with open('templatea.json', 'r', encoding='utf-8-sig') as ff:
+    with open(Path(BASE_DIR,path), 'r', encoding='utf-8-sig') as ff:
         a = json.load(ff)
     return a
 
@@ -158,6 +81,5 @@ def upgrade_users(user_id):
 # a = '123412'
 # upgrade_users(a)
 if __name__ == '__main__':
-    time_track(read_config)()
     time_track(read_userstate)()
     # upload_users()

@@ -12,6 +12,7 @@ from open_data import read_json
 BASE_DIR = Path(__file__).parent
 
 TALK_DICT_ANSWER_ALL = read_json('config/answers.json')
+TALK_TEMPLATE = read_json('config/templatea.json')
 settings = read_json('config/settings.json')
 views = read_json('views_json/validators.json')
 

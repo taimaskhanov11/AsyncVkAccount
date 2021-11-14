@@ -1,8 +1,6 @@
-import asyncio
 import datetime
 import os
 import random
-import statistics
 import time
 from multiprocessing import Process
 from threading import Thread
@@ -10,31 +8,15 @@ from threading import Thread
 from peewee import *
 from settings import async_time_track, time_track
 
-db_dir = os.path.join(os.path.dirname(__file__), 'users.db')
-
-db = SqliteDatabase(db_dir)
+pg_db = PostgresqlDatabase('vk_controller', user='postgres', password='postgres',
+                           host='localhost', port=5432)
 
 
 def time_track1(func):
+
     def surrogate(*args, **kwargs):
         started_at = time.time()
-
         result = func(*args, **kwargs)
-
-        ended_at = time.time()
-        # elapsed = round(ended_at - started_at, 5)
-        elapsed = ended_at - started_at
-        print(f'Execution time: {elapsed} s')
-        return elapsed
-
-    return surrogate
-
-
-def async_time_track1(func):
-    async def surrogate(*args, **kwargs):
-        started_at = time.time()
-
-        result = await func(*args, **kwargs)
 
         ended_at = time.time()
         # elapsed = round(ended_at - started_at, 5)
@@ -47,7 +29,7 @@ def async_time_track1(func):
 
 class BaseModel(Model):
     class Meta:
-        database = db
+        database = pg_db
 
 
 class Numbers(BaseModel):
@@ -80,25 +62,12 @@ class Users(BaseModel):
     state = IntegerField(default=1)
     name = CharField(default='')
     city = CharField(default='')
-    blocked = BooleanField(default=False)
-    joined_at = DateTimeField(default=datetime.datetime.now())
-    updated_at = DateTimeField(default=datetime.datetime.now())
-
-    # @classmethod
-    # @async_time_track
-    # async def get(cls, **kwargs):
-    #     return super(Users, cls).get( **kwargs)
-
+    type = BooleanField()
 
     @classmethod
     @async_time_track
     async def get_user(cls, user_id):
         return cls.get(user_id=user_id)
-
-    @classmethod
-    @async_time_track
-    async def create(cls, **kwargs):
-        return super(Users, cls).create(**kwargs)
 
     @classmethod
     @async_time_track
@@ -134,7 +103,7 @@ class Users(BaseModel):
     @classmethod
     @async_time_track
     async def add_state(cls, user_id):
-        user = cls.get(user_id=user_id)
+        user = await cls.get_user(user_id)
         user.state += 1
         user.save()
 
@@ -171,16 +140,13 @@ def probe(x):
     Users.add_state(x)
 
 
-@time_track1
+@time_track
 def probe2():
-    for i in range(1000):
-        Users.create(user_id=i, type=True)
-    for i in range(1000):
-        user = Users.get(user_id=i)
-        user.delete_instance()
+    for i in range(100):
+        Users.create_user(i, f'ALi{i}', f'alicity{i}', 1, random.choice([True, False]))
 
 
-@time_track1
+@time_track
 def runner():
     # now = time.time()
 
@@ -197,19 +163,13 @@ def runner():
 
 
 if __name__ == '__main__':
-    db.create_tables([Users, Numbers])
+    pg_db.create_tables([Users, Numbers])
     # Numbers.create_user(random.randint(1, 1000), '2', '3')
 
-    now = time.time()
-    # asyncio.run(probe2())
-    all_time = []
-    for i in range(10):
-        res = probe2()
-        all_time.append(res)
-    # print()
+    # now = time.time()
+    # probe2()
     # runner()
-    print('Общее время выполнения', time.time() - now)
-    print('Среднее время выполнения', statistics.mean(all_time))
+    # print('Общее время выполнения', time.time() - now)
 
 # for i in range(10):
 #     Users.create_user(i, 2, 'qasd', 'afasdf')

@@ -40,6 +40,12 @@ fix bugs and update settings.py decorators
 ------ TODO
 
 _ todo main
+# todo укоротить фукнции в run_session
+# todo создать тесты
+# todo flake8 и isort
+# todo сделать проверку через database
+# todo переопределение classmethods
+# todo создать базу данных под сообщения
 # todo написать тесты
 # todo сделать задержку перед первым ответом
 # todo добавить mathch case
