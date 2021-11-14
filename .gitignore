@@ -6,4 +6,3 @@ build
 __pycache__
 .idea
 add_utils
-views_json
