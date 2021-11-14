@@ -1,5 +1,4 @@
 *.log
-logs
 tests
 dist1
 build
