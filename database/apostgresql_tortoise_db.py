@@ -162,7 +162,7 @@ async def init_tortoise():
     #     modules={'models': ['database.apostgresql_tortoise_db']}
     # )
 
-    # await Tortoise.generate_schemas()
+    await Tortoise.generate_schemas()
 
 
 async def init():
