@@ -12,7 +12,7 @@ log_config = {
             "datefmt": "%Y-%m-%d %H:%M:%S"
         },
         "main_format": {
-            "format": "%(levelname)s :%(asctime)s:%(name)s:%(message)s",
+            "format": "%(levelname)s : %(asctime)s: %(name)s :%(message)s",
             "datefmt": "%Y-%m-%d %H:%M:%S"
         },
         "print_format": {
@@ -25,19 +25,19 @@ log_config = {
         "file_handler_connection": {
             "class": "logging.FileHandler",
             "formatter": "my_formatter",
-            "filename": f"{LOG_DIR}/VkBot_connection.log",
+            "filename": f"{LOG_DIR}/connection.log",
             "encoding": "utf8"
         },
         "file_handler_errors": {
             "class": "logging.FileHandler",
             "formatter": "my_formatter",
-            "filename": f"{LOG_DIR}/VkBot_errors.log",
+            "filename": f"{LOG_DIR}/errors.log",
             "encoding": "utf8"
         },
         "file_handler_talk": {
             "class": "logging.FileHandler",
             "formatter": "print_format",
-            "filename": f"{LOG_DIR}/VkBot_talk.log",
+            "filename": f"{LOG_DIR}/talk.log",
             "encoding": "utf-8"
         },
 
@@ -60,6 +60,12 @@ log_config = {
             "encoding": "utf-8"
         },
 
+        "file_handler_not_found_answer": {
+            "class": "logging.FileHandler",
+            "formatter": "print_format",
+            "filename": f"{LOG_DIR}/not_found_answer.log",
+            "encoding": "utf-8"
+        },
         "stream_handler": {
             "class": "logging.StreamHandler",
             "formatter": "main_format",
@@ -94,6 +100,12 @@ log_config = {
             "handlers": ["file_handler_property"],
             "level": "DEBUG",
         },
+
+        "not_found_answer": {
+            "handlers": ["file_handler_not_found_answer"],
+            "level": "DEBUG",
+        },
+
         "root": {
             "handlers": ["file_handler_main"],
             "level": "DEBUG",
@@ -105,3 +117,4 @@ logging.config.dictConfig(log_config)
 exp_log = logging.getLogger('VkBot_errors')
 talk_log = logging.getLogger('VkBot_talk')
 prop_log = logging.getLogger('property')
+not_answer_log = logging.getLogger('not_found_answer')

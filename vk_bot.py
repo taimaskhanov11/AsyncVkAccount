@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import functools
 import inspect
 import multiprocessing
 import random
@@ -8,6 +9,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Process
 from pprint import pprint
 from threading import Thread
@@ -18,17 +20,19 @@ import requests
 import telebot
 from aiovk import API, TokenSession
 from aiovk.drivers import HttpDriver
+from aiovk.exceptions import VkAuthError
 from aiovk.longpoll import UserLongPoll
 from colorama import init as colorama_init
+from tortoise import Tortoise
 from tqdm import tqdm, trange
 from vk_api.longpoll import Event, VkEventType
 from vk_api.vk_api import VkApiMethod
 
 # from database.database import Numbers, Users
-from database.apostgresql_tortoise_db import Input, Numbers, Users, init_tortoise
+from database.apostgresql_tortoise_db import Input, Numbers, Users, Account, Message, init_tortoise
 from interface.async_main import async_eel, init_eel, window_update
-from log_settings import exp_log, prop_log
-from settings import (LOG_COLORS, SIGNS, TEXT_HANDLER_CONTROLLER, TOKENS,
+from log_settings import exp_log, prop_log, not_answer_log
+from settings import (LOG_COLORS, signs, TEXT_HANDLER_CONTROLLER, TOKENS,
                       text_handler, VERSION, async_time_track, settings,
                       time_track, views, TALK_DICT_ANSWER_ALL, TALK_TEMPLATE)
 from utilities import find_most_city, search_answer
@@ -46,6 +50,7 @@ from typing import (
     TypeVar,
     Union,
 )
+
 # todo
 
 
@@ -57,7 +62,7 @@ colorama_init()
 
 
 @async_time_track
-async def upload_sql_users():
+async def upload_sql_users():  # todo
     users_all = await Users.all()
     for user in users_all:
         _id = user.user_id
@@ -69,22 +74,23 @@ async def upload_sql_users():
             USER_LIST[_id] = User(_id, user.state, user.name, user.city)
 
 
-@async_time_track
-async def update_users(user_id, name, mode='default', city=None):
-    if TEXT_HANDLER_CONTROLLER['accept_interface']:
-        await window_update(user_id, name, number='', mode='users' if mode else 'unusers')
+def create_thread_deco(func):
+    # @functools.wraps(func)
+    print(func.__name__)
 
-    if mode:
-        if mode == 'number':
-            unusers.append(user_id)
-            await Users.change_value(user_id, 'blocked', True)
-        else:
-            await Users.create(user_id=user_id, name=name, city=city, blocked=False)
-            USER_LIST[user_id] = User(user_id, 1, name, city)
-            users.append(user_id)
-            return USER_LIST[user_id]
-    else:
-        unusers.append(user_id)
+    def run(function, *args):
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(function(*args))
+
+    async def wrapper(*args, **kwargs):
+        print(args)
+        # func = functools.partial(*args, **kwargs)
+        Thread(target=run, args=(func, *args)).start()
+        await text_handler(signs['time'], f'{func.__name__:<36} запущен поток проверки состояния', 'debug',
+                           off_interface=True, talk=False, prop=True)
+        # await func(*args, **kwargs)
+
+    return wrapper
 
 
 class ResponseTimeTrack:
@@ -96,7 +102,7 @@ class ResponseTimeTrack:
         check_time_end = round(end_time - self.start_time, 6)
         text = f'Время полной проверки {check_time_end}s' if check else f'Время формирования ответа {check_time_end} s'
 
-        await text_handler(SIGNS['time'], text, 'debug', color='blue',
+        await text_handler(signs['time'], text, 'debug', color='blue',
                            off_interface=True, prop=True)
 
 
@@ -105,15 +111,11 @@ class ControlMeta(type):
         # pprint(attrs)
         for key, val in attrs.items():
 
-            # todo update
-            # match inspect.isfunction(val):
-            #     case '__init__' | 'act' | 'parse_event' | 'start_send_message' | 'send_status_tg':
-            #         pass
-            #     case
-
+            # todo update for match case
             if inspect.isfunction(val):
 
-                if key in ('__init__', 'act', 'parse_event', 'start_send_message', 'send_status_tg'):
+                if key in ('__init__', 'act', 'parse_event', 'start_send_message', 'send_status_tg',
+                           '_start_send_message_executor'):
                     continue
                 # print(val)
                 if asyncio.iscoroutinefunction(val):
@@ -138,7 +140,7 @@ class User(metaclass=ControlMeta):
         self.block_template = 0
         self.last_answer_time = 0
 
-    async def append_to_exel(self, user_id, text, name):
+    async def append_to_exel(self, user_id, text, name):  # todo убрать
         time = datetime.datetime.now().replace(microsecond=0)
         excel_data_df = pd.read_excel('username.xlsx')
         data = pd.DataFrame({
@@ -157,48 +159,39 @@ class User(metaclass=ControlMeta):
         self.state += 1
         await Users.add_state(self.user_id)
 
-    async def act(self, text, overlord):
+    async def number_success(self, overlord, text):
+        await self.append_to_exel(self.user_id, text, self.name)  # todo
+        await Numbers.create(user_id=self.user_id, name=self.name, city=self.city, text=text)
+        if TEXT_HANDLER_CONTROLLER['accept_interface']:
+            await window_update(self.user_id, self.name, text, mode='numbers')
 
-        if self.half_template <= self.state <= self.len_template + 1:
+        await text_handler(signs['mark'], f'{self.user_id} / {self.name} Номер получен добавление в unusers')
+        overlord.send_status_tg(f'бот {overlord.info["first_name"]} {overlord.info["last_name"]}\n'
+                                f'Полученные данные:\n'
+                                f'name      {self.name}\n'
+                                f'id        {self.user_id}\n'
+                                f'url       https://vk.com/id{self.user_id}\n'
+                                f'number    {text}')
+
+        await overlord.update_users(self.user_id, self.name, mode='number')
+
+    async def act(self, text, overlord):
+        await self.add_state()
+        if self.state >= self.half_template:
             result = re.findall('\d{4,}', text)
             if result:
-                # DONE
-                # self.append_to_exel(self.user_id, text, self.name) #todo
-                await Numbers.create(user_id=self.user_id, name=self.name, city=self.city, text=text)
-                if TEXT_HANDLER_CONTROLLER['accept_interface']:
-                    await window_update(self.user_id, self.name, text, mode='numbers')
-
-                await text_handler(SIGNS['mark'], f'{self.user_id} / {self.name} Номер получен добавление в unusers')
-                overlord.send_status_tg(f'бот {overlord.info["first_name"]} {overlord.info["last_name"]}\n'
-                                        f'Полученные данные:\n'
-                                        f'name      {self.name}\n'
-                                        f'id        {self.user_id}\n'
-                                        f'url       https://vk.com/id{self.user_id}\n'
-                                        f'number    {text}')
-
-                await update_users(self.user_id, self.name, mode='number')
-                # todo добавление в unuser после номера
+                await self.number_success(overlord, text)
                 return False
 
-            if self.state == self.len_template + 1:
-                # self.state += 1
-                await self.add_state()
+            # print(self.len_template)
+            if self.state >= self.len_template + 1:
                 return False
             res = random.choice(TALK_TEMPLATE[f"state{self.state}"])
-            # self.state += 1
-            await self.add_state()
-
             return res
 
         else:
-            if self.state >= self.len_template + 2:
-                return False
-            else:
-                res = random.choice(TALK_TEMPLATE[f"state{self.state}"])
-                await self.add_state()
-
-                # self.state += 1
-                return res
+            res = random.choice(TALK_TEMPLATE[f"state{self.state}"])
+            return res
 
 
 class VkUserControl(metaclass=ControlMeta):
@@ -210,13 +203,11 @@ class VkUserControl(metaclass=ControlMeta):
         # self.session = vk_api.VkApi(token=token, api_version='5.131')
         # self.session = TokenSession(self.token)
         self.loop = loop
-        if loop:
-            self.session = TokenSession(self.token, driver=HttpDriver(loop=loop))
-        else:
-            self.session = TokenSession(self.token)
+        self.driver = HttpDriver(loop=loop) if loop else None
+        self.session = TokenSession(self.token, driver=self.driver)
         self.tg_bot = telebot.TeleBot(settings['telegram_token'])
         self.vk = API(self.session)
-        # self.longpoll = VkLongPoll(self.session)
+
         self.longpoll = UserLongPoll(self.vk, mode=1, version=3)
         self.users_block = {}
         self.validators = (self.photo_validator, self.age_validator, self.count_friends_validator, self.mens_validator,)
@@ -225,13 +216,10 @@ class VkUserControl(metaclass=ControlMeta):
         self.block_message_count = 2
         self.signal_end = False
         self.message_threads = []
-
-    def run(self):
-        # print('Текущий поток', multiprocessing.current_process(), threading.current_thread())#todo
-        print(multiprocessing.current_process())
-        print(threading.current_thread())
-        self.loop.run_until_complete(self.run_session())
-        # await self.run_session()
+        self.state_answer_count = len(TALK_TEMPLATE) + 4
+        self.executor = ThreadPoolExecutor()
+        self.table_account = None
+        self.start_status = True
 
     def send_status_tg(self, text):
         print('отправка')
@@ -243,7 +231,7 @@ class VkUserControl(metaclass=ControlMeta):
                                       fields='sex, bdate, has_photo, city')
         return res[0]
 
-    async def sen_message(self, user, text):
+    async def send_message(self, user, text):
         await self.vk.messages.send(user_id=user,
                                     message=text,
                                     random_id=0)
@@ -273,12 +261,27 @@ class VkUserControl(metaclass=ControlMeta):
     def check_and_add_friend(self, user_id):  # todo
         pass
 
-    async def send_activity(self, user_id):
-        req = f'https://api.vk.com/method/messages.setActivity?user_id={user_id}&type=typing&access_token={self.token}&v=5.131'
-        async with aiohttp.ClientSession() as session:
-            await session.get(url=req)
-            # async with session.get(url=req) as response:
-            #     pass
+    def _start_send_message_executor(self, auth_user, text):
+        loop = asyncio.new_event_loop()
+        loop.set_default_executor(self.executor)
+        asyncio.set_event_loop(loop)
+
+        loop.run_until_complete(self.thread_send_message(auth_user, text, loop))
+
+    async def _create_message_executor(self, auth_user, current_answer):
+        # loop = asyncio.get_event_loop()
+        # loop.set_default_executor(self.executor)
+        # await loop.run_in_executor(self.executor, self._start_send_message_executor, auth_user, current_answer) #todo
+        task = Thread(target=self._start_send_message_executor, args=(auth_user, current_answer))
+        self.message_threads.append(task)
+        task.start()
+
+        # await loop.run_in_executor(self.executor, self.thread_send_message, auth_user, current_answer)
+
+    async def _create_message_thread(self, auth_user, current_answer):  # todo
+        task = Thread(target=self.start_send_message, args=(auth_user, current_answer))
+        self.message_threads.append(task)
+        task.start()
 
     def start_send_message(self, auth_user, text):
         loop = asyncio.new_event_loop()
@@ -288,13 +291,13 @@ class VkUserControl(metaclass=ControlMeta):
         # loop = asyncio.get_event_loop()
         # print(loop)
         loop.run_until_complete(self.thread_send_message(auth_user, text, loop))
+        # loop.run_until_complete(self.thread_send_message2(auth_user, text))
 
     async def thread_send_message(self, auth_user, text, loop):
         # async with TokenSession(self.token) as session:
         async with TokenSession(self.token, driver=HttpDriver(loop=loop)) as session:
             # session =
             vk = API(session)
-
             auth_user.block_template += 1
             # рандомный сон
             delay_response_from, delay_response_to = settings['delay_response_from'], settings['delay_response_to']
@@ -304,7 +307,7 @@ class VkUserControl(metaclass=ControlMeta):
 
             await asyncio.sleep(random_sleep_answer)
 
-            # Сон для задержки между сообщениями
+            # todo Сон для задержки между сообщениями
 
             # todo доделать last_answer_time
             # while auth_user.last_answer_time > time.time():
@@ -313,35 +316,19 @@ class VkUserControl(metaclass=ControlMeta):
 
             auth_user.last_answer_time = time.time() + settings['delay_between_messages']
 
-            # todo
-            # now = time.time()
+            # todo доделать ответы между посленими сообщениями
             await vk.messages.setActivity(user_id=auth_user.user_id, type='typing')
-            # print(time.time() - now)
             # await self.vk('messages.set_activity', user_id=user_id, type='typing')#todo
-            # now = time.time()
-            # await self.send_activity(user_id)
-            # print(time.time() - now)
-            # print('asd')
-            # print(res)
-            # answ = requests.get(req)
-            # print(answ)
+
             # рандомный сон
             delay_typing_from, delay_typing_to = settings['delay_typing_from'], settings['delay_typing_to']
             random_sleep_typing = random.randint(delay_typing_from, delay_typing_to)
 
             await asyncio.sleep(random_sleep_typing)
 
-            # await self.sen_message(user_id, text)
-
             await vk.messages.send(user_id=auth_user.user_id,
                                    message=text,
                                    random_id=0)
-            # loop.close()
-        # await self.sen_message(user_id, text)  # отправка ответа
-
-        # self.session.method('messages.send', {'user_id': user_id,
-        #                                       'message': text,
-        #                                       'random_id': 0, })
 
         USER_LIST[auth_user.user_id].block_template = 0
 
@@ -353,19 +340,27 @@ class VkUserControl(metaclass=ControlMeta):
             file = f'{self.info["id"]}.png'
             with open(f'interface/www/media/{file}', 'wb') as ff:
                 ff.write(res)
-            await text_handler(SIGNS['green'], 'Фото загружено')
+            await text_handler(signs['green'], 'Фото загружено')
             await async_eel.giveAvatar(file)()
 
-    async def user_info_view(self, info, friend_list, age, has_photo):
-        await text_handler(SIGNS['yellow'], f"{info['first_name']}, {info['last_name']}, {info['id']}",
-                           'warning')
-        await text_handler(SIGNS['yellow'], f"{friend_list['count']} - Количество друзей", 'warning')
-        await text_handler(SIGNS['yellow'], f'Возраст - {age}', 'warning')
-        await text_handler(SIGNS['yellow'], f'Фото {has_photo}', 'warning')
+    async def user_info_view(self, info, count_friend, age, has_photo):
+        await text_handler(signs['yellow'], f"{info['first_name']}, {info['last_name']}, {info['id']}", 'warning')
+        await text_handler(signs['yellow'], f"{count_friend} - Количество друзей", 'warning')
+        await text_handler(signs['yellow'], f'Возраст - {age}', 'warning')
+        await text_handler(signs['yellow'], f'Фото {has_photo}', 'warning')
 
     async def get_self_info(self):
+
         res = await self.vk.users.get(fields=['photo_max_orig'])
+
         self.info = res[0]
+        table_account = await Account.get_or_create(
+            user_id=self.info['id'], defaults={
+                'token': self.token,
+                'name': self.info['first_name']
+            },
+        )
+        self.table_account = table_account[0]
 
     def parse_event(self, raw_event):
         return self.DEFAULT_EVENT_CLASS(raw_event)
@@ -379,23 +374,94 @@ class VkUserControl(metaclass=ControlMeta):
 
         return VkApiMethod(self)
 
+    async def create_response(self, text, auth_user):
+
+        template = await auth_user.act(text, self)  # todo
+        if template:
+            answer = await Input.find_output(text, auth_user.city)
+            if not answer:
+                not_answer_log.warning(f'{auth_user.user_id} {auth_user.name} --> {text}')
+
+            current_answer = f'{answer} {template}'
+
+            table_user = await Users.get(user_id=auth_user.user_id)  # todo
+            await Message.create(user=table_user, received=text, sent_by_bot=current_answer)
+
+            await self._create_message_thread(auth_user, current_answer)  # todo
+            # await self._create_message_executor(auth_user, f'{answer} {template}')
+
+        else:
+            await text_handler(signs['red'],
+                               f"{auth_user.user_id} / {auth_user.name} / Стадия 7 или больше / Игнор / Проверка на номер ",
+                               'error')
+
+    async def block_account_message(self):
+        await text_handler(signs['red'], 'Ошибка авторизации!!!', 'error')
+        await text_handler(signs['yellow'], 'Возможно вы ввели неправильный токен или аккаунт ЗАБЛОКИРОВАН!',
+                           'error', color='red')
+        await text_handler(signs['version'], f'Ваш токен {self.token}',
+                           'error', color='red')
+
+    async def update_users(self, user_id, name, mode: str | bool = 'default', city=None):
+        if TEXT_HANDLER_CONTROLLER['accept_interface']:
+            await window_update(user_id, name, number='', mode='users' if mode else 'unusers')
+
+        if mode:
+            if mode == 'number':
+                unusers.append(user_id)
+                await Users.change_value(user_id, 'blocked', True)
+            else:
+                await Users.create(account=self.table_account, user_id=user_id, name=name, city=city)
+                USER_LIST[user_id] = User(user_id, 0, name, city)
+                users.append(user_id)
+                return USER_LIST[user_id]
+        else:
+            unusers.append(user_id)
+
+    # todo проверка состояния
+
+    def create_signals_thread(self, func, *args):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(func(*args))
+
+    async def check_signals(self, user_id):
+        await Tortoise.init(  # todo
+            db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
+            modules={'models': ['database.apostgresql_tortoise_db']}
+        )
+        print('проверка норм')
+        self.table_account = await Account.get(user_id = user_id)
+        while True:
+            await asyncio.sleep(5)
+            # await self.table_account.connection.
+            await self.table_account.refresh_from_db(fields=['start_status'])
+            if self.start_status:
+                if not self.table_account.start_status:
+                    self.start_status = False
+            else:
+                if self.table_account.start_status:
+                    self.start_status = True
+
     async def run_session(self):
         # await asyncio.sleep(1)
-        print(threading.current_thread())
-        print(self.loop)
         print(asyncio.get_event_loop())
-        # print(asyncio.new_event_loop())
-        # print(self.parse_event.__name__, 'parse_event')
-        # print(self.get_self_info.__name__,  'get_self_info')
-        # await init_tortoise()
-        # await Tortoise.init(
-        #     db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
-        #     modules={'models': ['database.apostgresql_tortoise_db']}
-        # )
-        await self.get_self_info()
+        print('Текущий поток', multiprocessing.current_process(), threading.current_thread())  # todo
+
+        try:
+            await self.get_self_info()
+        except VkAuthError as e:
+            print(e)
+            await self.block_account_message()
+            exp_log.error(e)
+            exit()
+
+        # func = lambda x, *args: Thread(target=self.create_signals_thread, args=(x, *args,)).start()
+        # func(self.check_signals, self.info['id'])
+
         if TEXT_HANDLER_CONTROLLER['accept_interface']:
             await self.initialization_menu()
-
+        print(self.info)
         while True:
             try:
                 async for event_a in self.longpoll.iter():
@@ -416,58 +482,45 @@ class VkUserControl(metaclass=ControlMeta):
                             return
 
                         if user in unusers:
-                            await text_handler(SIGNS['red'], f'Новое сообщение от {user} / Черный список / : {text}',
+                            await text_handler(signs['red'], f'Новое сообщение от {user} / Черный список / : {text}',
                                                'error')  # todo
                             continue
 
                         elif user in users:
                             auth_user = USER_LIST[user]
-                            if auth_user.block_template < self.block_message_count:
-                                name = auth_user.name
-                                city = auth_user.city
+                            if auth_user.state > self.state_answer_count:
+                                await text_handler(signs['red'],
+                                                   f'Новое сообщение от {user} / Черный список / : {text}',
+                                                   'error')  # todo
 
-                                await text_handler(SIGNS['green'], f'Новое сообщение от {name} / {user} - {text}',
+                                unusers.append(auth_user.user_id)
+                                table_user = await Users.get(user_id=auth_user.user_id)
+                                table_user.blocked = True
+                                await table_user.save()
+
+                            elif auth_user.block_template < self.block_message_count:
+                                await text_handler(signs['green'],
+                                                   f'Новое сообщение от {auth_user.name} / {user} - {text}',
                                                    'info')  # todo
 
-                                # answer = await search_answer(text, city) #todo
-                                answer = await Input.find_output(text, city)
-                                template = await auth_user.act(text, self)  # todo
-
-                                # Сохранение состояния в файл
-                                if template:
-                                    # await self.thread_send_message(user, f"{answer} {template}")
-                                    # loop = asyncio.new_event_loop()
-                                    # loop = asyncio.get_event_loop()
-                                    # executor = ThreadPoolExecutor(5)
-                                    # loop.set_default_executor(executor)
-                                    task = Thread(target=self.start_send_message,
-                                                  args=(auth_user, f"{answer} {template}"))
-                                    self.message_threads.append(task)
-                                    task.start()
-
-                                else:
-                                    await text_handler(SIGNS['red'], f"{user} / {name} / Стадия 7 или больше / Игнор",
-                                                       'error')
+                                await self.create_response(text, auth_user)
 
                                 await res_time_track.stop()
 
-                                # check_time_end = round(time.time() - check_time_start, 6)
-                                # await TextHandler(SIGNS['time'], f'Время формирования ответа {check_time_end} s',
-                                #                   'debug',
-                                #                   # todo сделать функцией
-                                #                   off_interface=True, prop=True)
+                                table_user = await Users.get(user_id=auth_user.user_id)  # todo
+                                await Message.create(user=table_user, received=text, sent_by_bot='NONE')
 
                         else:  # Если нету в базе
                             info = await self.get_user_info(user)
                             # print(info)
                             name = info['first_name']
-                            await text_handler(SIGNS['yellow'],
+                            await text_handler(signs['yellow'],
                                                f'Новое сообщение от {name} / {user} / Нету в базе - {text}',
                                                'warning')
 
                             closed = info["can_access_closed"]
                             add_status = await self.check_status_friend(user)
-                            await text_handler(SIGNS['yellow'], f"Статус дружбы {add_status}", 'warning')
+                            await text_handler(signs['yellow'], f"Статус дружбы {add_status}", 'warning')
 
                             if not closed:
                                 if add_status == 0:
@@ -476,23 +529,23 @@ class VkUserControl(metaclass=ControlMeta):
 
                                     if self.users_block[user] > 1:
                                         continue
-                                    await self.sen_message(user, random.choice(
+                                    await self.send_message(user, random.choice(
                                         TALK_DICT_ANSWER_ALL['private']['выход']))
 
                                     self.users_block[user] += 1
                                     continue
 
                                 elif add_status == 2:
-                                    await text_handler(SIGNS['yellow'], f"Добавление в друзья", 'warning')
+                                    await text_handler(signs['yellow'], f"Добавление в друзья", 'warning')
                                     await self.add_friend(user)
 
                                 elif add_status == 1:
-                                    await self.sen_message(user,
-                                                           "было бы круто если бы ты принял заявку в друзья &#128522;")
+                                    await self.send_message(user,
+                                                            "было бы круто если бы ты принял заявку в друзья &#128522;")
                                     continue
 
                             if add_status == 2:
-                                await text_handler(SIGNS['yellow'], f"Добавление в друзья", 'warning')
+                                await text_handler(signs['yellow'], f"Добавление в друзья", 'warning')
                                 await self.add_friend(user)
 
                             friend_list = await self.get_friend(user)
@@ -504,65 +557,44 @@ class VkUserControl(metaclass=ControlMeta):
                             male = m_f_count.count(2)
                             age = info.get('bdate')
                             has_photo = info['has_photo']
-
-                            await self.user_info_view(info, friend_list, age, has_photo)
-
                             count_friend = friend_list['count']
+
+                            await self.user_info_view(info, count_friend, age, has_photo)
+
                             valid = await self.all_validators(has_photo, age, count_friend,
                                                               (male, female, count_friend))
-                            # if self.age_validator(age) and self.count_friends_validator(count_friend) and has_photo:
                             if valid:
-                                # todo выбрать между много проц поточ и одним
-                                await text_handler(SIGNS['mark'],
+                                await text_handler(signs['mark'],
                                                    f'{user} / {name} / Прошел все проверки / Добавлен в users',
                                                    'info')
                                 # поиск города
                                 city = await find_most_city(friend_list)
-                                auth_user = await update_users(user, name, city=city)
+                                auth_user = await self.update_users(user, name, city=city)
 
-                                template = await auth_user.act(text, self)
-                                # answer = await search_answer(text, city)
-                                answer =  await Input.find_output(text, city)
-
-                                current_answer = f"{answer} {template}" if (
-                                        answer or template) else await search_answer('привет', friend_list)
-
-                                # todo update current_answer
-                                # match answer, template:
-                                #     case str(answer)|str(template):
-                                #         print()
-
-                                # todo
-                                # await self.sen_message(user, current_answer)
+                                await self.create_response(text, auth_user)
 
                                 await res_time_track.stop(check=True)
-
-                                # check_time_end = round(time.time() - check_time_start, 6)
-                                # await TextHandler(SIGNS['time'], f'Время полной проверки {check_time_end} s', 'debug',
-                                #                   off_interface=True, prop=True)
-
-                                # loop = asyncio.new_event_loop()
-                                # loop = asyncio.get_event_loop()
-                                # executor = ThreadPoolExecutor(5)
-                                # loop.set_default_executor(executor)
-
-                                task = Thread(target=self.start_send_message,
-                                              args=(auth_user, f"{current_answer}"))
-                                self.message_threads.append(task)
-                                task.start()
                                 continue
+                            else:
+                                # verification_failed(user, name)
 
-                            # verification_failed(user, name)
+                                await text_handler(signs['red'],
+                                                   f'{user} {name} Проверку не прошел / Добавлен в unusers',
+                                                   'error')
+                                await self.update_users(user, name, False)
 
-                            await text_handler(SIGNS['red'], f'{user} {name} Проверку не прошел / Добавлен в unusers',
-                                               'error')
-                            await update_users(user, name, False)
+            except VkAuthError as e:
+                print(e)
+                exp_log.error(e)
+                await self.block_account_message()
+                await Account.blocking(self.info['id'])
+                return
 
             except Exception as e:
                 # raise
                 exp_log.exception(e)
                 print('ПЕРЕПОДКЛЮЧЕНИЕ...')  # todo
-                await text_handler(SIGNS['red'], 'ПЕРЕПОДКЛЮЧЕНИЕ...', 'error')
+                await text_handler(signs['red'], 'ПЕРЕПОДКЛЮЧЕНИЕ...', 'error')
 
     # def all_validators(self, age, count_friends, friends, male):
     # todo
@@ -573,17 +605,10 @@ class VkUserControl(metaclass=ControlMeta):
                 return False
         return True
 
-    # async def all_validators(self, *args):
-    #        validators = (await func(value) for func, value in zip(self.validators, args))
-    #        async for valid in validators:
-    #            if not valid:
-    #                return False
-    #        return True
-
     async def photo_validator(self, photo) -> bool:
         validator = views['validators']['photo_validator']
 
-        await text_handler(SIGNS['yellow'], validator['check'], 'warning')
+        await text_handler(signs['yellow'], validator['check'], 'warning')
 
         # todo update
         # match bool(photo):
@@ -595,16 +620,16 @@ class VkUserControl(metaclass=ControlMeta):
         #         return False
 
         if photo:
-            await text_handler(SIGNS['yellow'], validator['success'])
+            await text_handler(signs['yellow'], validator['success'])
             return True
         else:
-            await text_handler(SIGNS['red'], validator['failure'], 'error')
+            await text_handler(signs['red'], validator['failure'], 'error')
             return False
 
     async def age_validator(self, age: str | int) -> bool:
         validator = views['validators']['age_validator']
 
-        await text_handler(SIGNS['yellow'], validator['check'], 'warning')
+        await text_handler(signs['yellow'], validator['check'], 'warning')
         try:
             if age:
                 # print(age)
@@ -613,10 +638,10 @@ class VkUserControl(metaclass=ControlMeta):
                 # print(age)
                 date = 2021 - int(age)
                 if date >= 20:
-                    await text_handler(SIGNS['green'], validator['success'])
+                    await text_handler(signs['green'], validator['success'])
                     return True
                 else:
-                    await text_handler(SIGNS['red'], validator['failure'], 'error')
+                    await text_handler(signs['red'], validator['failure'], 'error')
                     return False
             else:
                 return True  # todo
@@ -627,13 +652,13 @@ class VkUserControl(metaclass=ControlMeta):
     async def count_friends_validator(self, count: int) -> bool:
         validator = views['validators']['count_friends_validator']
 
-        await text_handler(SIGNS['yellow'], validator['check'], 'warning')
+        await text_handler(signs['yellow'], validator['check'], 'warning')
         # count = session.method('status.get', {'user_id': user_id})
         if 24 <= count <= 1001:
-            await text_handler(SIGNS['green'], validator['success'])
+            await text_handler(signs['green'], validator['success'])
             return True
         else:
-            await text_handler(SIGNS['red'], validator['failure'], 'error')
+            await text_handler(signs['red'], validator['failure'], 'error')
             return False
 
     async def mens_validator(self, info: tuple) -> bool:
@@ -648,15 +673,15 @@ class VkUserControl(metaclass=ControlMeta):
             :rtype: bool
         """
         male, female, friends = info
-        await text_handler(SIGNS['yellow'], f' девушек - {female}', 'warning', )
-        await text_handler(SIGNS['yellow'], f'Количество парней - {male}', 'warning', )
-        await text_handler(SIGNS['yellow'], validator['check'], 'warning', )
+        await text_handler(signs['yellow'], f' девушек - {female}', 'warning', )
+        await text_handler(signs['yellow'], f'Количество парней - {male}', 'warning', )
+        await text_handler(signs['yellow'], validator['check'], 'warning', )
         res = male / friends * 100
         if round(res) <= 35:
-            await text_handler(SIGNS['red'], validator['failure'], 'error')
+            await text_handler(signs['red'], validator['failure'], 'error')
             return False
         else:
-            await text_handler(SIGNS['yellow'], validator['success'].format(res))
+            await text_handler(signs['yellow'], validator['success'].format(res))
             return True
 
 
@@ -677,15 +702,7 @@ def is_bad_proxy(pip):
     return False
 
 
-red_point = LOG_COLORS['error'][1]
-green_point = LOG_COLORS['info'][1]
-yellow_point = LOG_COLORS['warning'][1]
-
-
-# sign #todo
-
-
-async def upload_all_data_main(statusbar=True):
+async def upload_all_data_main(statusbar=False):
     """Инициализация данных профиля и сохранений в базе"""
     try:
         if TEXT_HANDLER_CONTROLLER['accept_interface']:
@@ -695,41 +712,27 @@ async def upload_all_data_main(statusbar=True):
 
         await init_tortoise()
 
-        await text_handler(SIGNS['magenta'], f'Загруженно токенов {len(TOKENS)}: ', color='magenta')
+        await text_handler(signs['magenta'], f'Загруженно токенов {len(TOKENS)}: ', color='magenta')
         for a, b in enumerate(TOKENS, 1):
-            await text_handler(SIGNS['magenta'], f"    {b}", color='magenta')
+            await text_handler(signs['magenta'], f"    {b}", color='magenta')
 
         delay = f"[{settings['delay_response_from']} - {settings['delay_response_to']}] s"
-        await text_handler(SIGNS['magenta'], f"    Задержка перед ответом : {delay}", color='cyan')
+        await text_handler(signs['magenta'], f"    Задержка перед ответом : {delay}", color='cyan')
         delay = f"[{settings['delay_typing_from']} - {settings['delay_typing_to']}] s"
-        await text_handler(SIGNS['magenta'], f"    Длительность отображения печати : {delay}", color='cyan')
-
-        answer2 = f"Данные для разговора загружены"
-        await text_handler(SIGNS['mark'], answer2)
-
-        answer1 = 'template.json'
-        await text_handler(SIGNS['mark'], f'Файл {answer1} для шаблонов загружен')
+        await text_handler(signs['magenta'], f"    Длительность отображения печати : {delay}", color='cyan')
 
         # Выгрузка стадий и юзеров
         await upload_sql_users()
 
         # todo
-        answer2 = 'userstate.json'
-        await text_handler(SIGNS['mark'], f'Файл {answer2} для этапов ИИ загружен')
-        await text_handler(SIGNS['magenta'], 'Проверка прокси:', color='magenta')
+        await text_handler(signs['magenta'], 'Проверка прокси:', color='magenta')
         for proxy in settings['proxy']:
-            await text_handler(SIGNS['magenta'], '    PROXY {proxy} IS WORKING'.format(proxy=proxy))
+            await text_handler(signs['magenta'], '    PROXY {proxy} IS WORKING'.format(proxy=proxy))
         time.sleep(1)
 
         if statusbar:
-            for i in trange(300, colour='green', smoothing=0.1,unit_scale=True):
+            for i in trange(300, colour='green', smoothing=0.1, unit_scale=True):
                 time.sleep(0.001)
-
-        # with tqdm(total=100, colour='green') as pbar:
-        #     for i in range(100):
-        #         time.sleep(0.1)
-        #         pbar.update(0.1)
-
         # if is_bad_proxy(proxy):
         #     await TextHandler(SIGNS['magenta'], f"    BAD PROXY {proxy}", log_type='error', full=True)
         # else:

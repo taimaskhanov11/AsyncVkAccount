@@ -81,8 +81,6 @@ async def main(token=None):
         await init_eel()
     await upload_all_data_main(statusbar=False)
     # run_threads(TOKENS)  # todo
-    #
-
     vk = VkUserControl(token or TOKENS[0])
     await vk.run_session()
     # loop = asyncio.get_event_loop()

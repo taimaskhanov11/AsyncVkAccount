@@ -29,7 +29,7 @@ VERSION = settings['version']
 TEXT_HANDLER_CONTROLLER = settings['text_handler_controller']
 TOKENS = settings['tokens']
 
-SIGNS = {
+signs = {
     "red": "✖",
     "green": "◯",
     "yellow": "⬤",
@@ -80,7 +80,7 @@ def time_track(func):
         execute_time = f'{"Executed time"} {end} s'
         func_name = f'{path}/{func.__name__}'
         # print(func_name)
-        asyncio.create_task(text_handler(SIGNS['time'], f'{func_name:<36} {execute_time}', 'debug',
+        asyncio.create_task(text_handler(signs['time'], f'{func_name:<36} {execute_time}', 'debug',
                                          off_interface=True, talk=False, prop=True))
         # prop_log.debug(f'{func.__name__} Executed time {round(time.time() - now, 5)} s')
         return res
@@ -98,7 +98,7 @@ def async_time_track(func):
         end = time.monotonic() - now
         execute_time = f'{"Executed time"} {end} s'
         func_name = f'{path}/{func.__name__}'
-        await text_handler(SIGNS['time'], f'{func_name:<36} {execute_time}', 'debug',
+        await text_handler(signs['time'], f'{func_name:<36} {execute_time}', 'debug',
                            off_interface=True, talk=False, prop=True)
         # prop_log.debug(f'{func.__name__} Executed time {round(time.time() - now, 5)} s')
         return res

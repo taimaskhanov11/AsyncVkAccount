@@ -35,6 +35,7 @@ def async_time_track1(func):
 
 class Category(Model):
     title = fields.CharField(max_length=255, unique=True, index=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
 
     @classmethod
     def create_from_dict(cls):
@@ -51,6 +52,7 @@ class Category(Model):
 class Input(Model):
     category = fields.ForeignKeyField('models.Category', related_name='input')
     text = fields.CharField(index=True, max_length=255)
+    created_at = fields.DatetimeField(auto_now_add=True)
 
     @classmethod
     def create_from_dict(cls):
@@ -73,7 +75,7 @@ class Input(Model):
                         answer.format(city)
                     answer_end += answer + ','
             answer_end = answer_end[0:-1]
-            print('answer in find_output', answer_end)
+            # print('answer in find_output', answer_end)
             return answer_end
         except Exception as e:
             print(e)
@@ -87,14 +89,15 @@ class Input(Model):
     #     res = await cls.find_output(text)
     #     return res
 
-        # if field.category.title == 'город': #todo
-        #     answer.format(city or TALK_DICT_ANSWER_ALL['негород']['выход'])
-        #
+    # if field.category.title == 'город': #todo
+    #     answer.format(city or TALK_DICT_ANSWER_ALL['негород']['выход'])
+    #
 
 
 class Output(Model):
     category = fields.ForeignKeyField('models.Category', related_name='output')
     text = fields.TextField()
+    created_at = fields.DatetimeField(auto_now_add=True)
 
     @classmethod
     def create_from_dict(cls):
@@ -107,7 +110,7 @@ class Numbers(Model):
     city = fields.CharField(default='', max_length=100)
     number = fields.CharField(default='', max_length=100)
     date = fields.DatetimeField(default=datetime.datetime.now().replace(microsecond=0))
-    created_at = fields.DatetimeField(default=datetime.datetime.now())
+    created_at = fields.DatetimeField(auto_now_add=True)
 
     def __str__(self):
         return self.name
@@ -121,13 +124,14 @@ class Numbers(Model):
 
 
 class Users(Model):
-    user_id = fields.IntField(unique=True)
-    state = fields.IntField(default=1)
+    account = fields.ForeignKeyField('models.Account', related_name='users')
+    user_id = fields.IntField(unique=True, index=True)
+    state = fields.IntField(default=0)
     name = fields.CharField(default='default', max_length=100)
     city = fields.CharField(default='default', max_length=100)
     blocked = fields.BooleanField(default=False)
-    joined_at = fields.DatetimeField(default=datetime.datetime.now())
-    updated_at = fields.DatetimeField(default=datetime.datetime.now())
+    joined_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now_add=True)  # todo
 
     def __str__(self):
         return self.name
@@ -147,9 +151,34 @@ class Users(Model):
         setattr(user, title, value)
         await user.save()
 
+
+class Message(Model):
+    user = fields.ForeignKeyField('models.Users', related_name='messages', index=True)
+    sent_at = fields.DatetimeField(auto_now_add=True)
+    received = fields.TextField()
+    sent_by_bot = fields.TextField()
+
+
+class Account(Model):
+    token = fields.CharField(max_length=255)
+    name = fields.CharField(max_length=255)
+    user_id = fields.IntField(index=True, unique=True)
+    blocked = fields.BooleanField(default=False)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    start_status = fields.BooleanField(default=True)
+
+
+    @classmethod
+    @async_time_track
+    async def blocking(cls, user_id):
+        account = await cls.get(user_id=user_id)
+        account.blocked = True
+        await account.save()
+
+
 @async_time_track
 async def init_tortoise():
-    await Tortoise.init( #todo
+    await Tortoise.init(  # todo
         db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
         modules={'models': ['database.apostgresql_tortoise_db']}
     )
@@ -262,13 +291,27 @@ async def heroku_init():
     await Tortoise.generate_schemas()
 
 
+async def test2():
+    await Tortoise.init(
+        db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
+        modules={'models': ['__main__']}
+    )
+    await Tortoise.generate_schemas()
+    # await Output.create()
+    # await main()
+    # ou = await Output.get(id=1)
+    # ou.text = 'привет привеееет'
+    # await ou.save()
+    # print(ou.text)
 
 
 # asyncio.run(test())
 if __name__ == '__main__':
-    # run_async(init())
+    run_async(test2())
+    Account.default_connection()
+    # Tortoise.
     # run_async(speed_test_create_delete())
-    run_async(heroku_init())
+    # run_async(heroku_init())
     pass
 # loop = asyncio.new_event_loop()
 # loop.run_until_complete(main())
