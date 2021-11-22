@@ -37,6 +37,9 @@ class Category(Model):
     title = fields.CharField(max_length=255, unique=True, index=True)
     created_at = fields.DatetimeField(auto_now_add=True)
 
+    class Meta:
+        table = "app_vk_controller_category"
+
     @classmethod
     def create_from_dict(cls):
         pass
@@ -53,6 +56,9 @@ class Input(Model):
     category = fields.ForeignKeyField('models.Category', related_name='input')
     text = fields.CharField(index=True, max_length=255)
     created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "app_vk_controller_input"
 
     @classmethod
     def create_from_dict(cls):
@@ -99,6 +105,9 @@ class Output(Model):
     text = fields.TextField()
     created_at = fields.DatetimeField(auto_now_add=True)
 
+    class Meta:
+        table = "app_vk_controller_output"
+
     @classmethod
     def create_from_dict(cls):
         pass
@@ -111,6 +120,9 @@ class Numbers(Model):
     number = fields.CharField(default='', max_length=100)
     date = fields.DatetimeField(default=datetime.datetime.now().replace(microsecond=0))
     created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "app_vk_controller_numbers"
 
     def __str__(self):
         return self.name
@@ -133,6 +145,9 @@ class Users(Model):
     joined_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now_add=True)  # todo
 
+    class Meta:
+        table = "app_vk_controller_user"
+
     def __str__(self):
         return self.name
 
@@ -154,9 +169,14 @@ class Users(Model):
 
 class Message(Model):
     user = fields.ForeignKeyField('models.Users', related_name='messages', index=True)
+    account = fields.ForeignKeyField('models.Account', related_name='messages', index=True)
     sent_at = fields.DatetimeField(auto_now_add=True)
-    received = fields.TextField()
-    sent_by_bot = fields.TextField()
+    text = fields.TextField()
+    answer_question = fields.TextField()
+    answer_template = fields.TextField()
+
+    class Meta:
+        table = "app_vk_controller_message"
 
 
 class Account(Model):
@@ -167,6 +187,8 @@ class Account(Model):
     created_at = fields.DatetimeField(auto_now_add=True)
     start_status = fields.BooleanField(default=True)
 
+    class Meta:
+        table = "app_vk_controller_account"
 
     @classmethod
     @async_time_track
@@ -179,7 +201,8 @@ class Account(Model):
 @async_time_track
 async def init_tortoise():
     await Tortoise.init(  # todo
-        db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
+        # db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
+        db_url='postgres://postgres:postgres@localhost:5432/django_db',
         modules={'models': ['database.apostgresql_tortoise_db']}
     )
     # await Tortoise.init( #todo
@@ -191,7 +214,7 @@ async def init_tortoise():
     #     modules={'models': ['database.apostgresql_tortoise_db']}
     # )
 
-    await Tortoise.generate_schemas()
+    # await Tortoise.generate_schemas()
 
 
 async def init():
@@ -296,7 +319,7 @@ async def test2():
         db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
         modules={'models': ['__main__']}
     )
-    await Tortoise.generate_schemas()
+    # await Tortoise.generate_schemas()
     # await Output.create()
     # await main()
     # ou = await Output.get(id=1)
@@ -305,10 +328,19 @@ async def test2():
     # print(ou.text)
 
 
+async def djagno_init():
+    await Tortoise.init(
+        db_url='postgres://postgres:postgres@localhost:5432/django_db',
+        modules={'models': ['__main__']}
+    )
+    await Tortoise.generate_schemas()
+
+
 # asyncio.run(test())
 if __name__ == '__main__':
     run_async(test2())
-    Account.default_connection()
+    run_async(djagno_init())
+    # Account.default_connection()
     # Tortoise.
     # run_async(speed_test_create_delete())
     # run_async(heroku_init())

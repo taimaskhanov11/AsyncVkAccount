@@ -66,12 +66,12 @@ async def upload_sql_users():  # todo
     users_all = await Users.all()
     for user in users_all:
         _id = user.user_id
+        USER_LIST[_id] = User(_id, user.state, user.name, user.city)
         if user.blocked:
             unusers.append(_id)
             # print(USER_LIST)
         else:
             users.append(_id)
-            USER_LIST[_id] = User(_id, user.state, user.name, user.city)
 
 
 def create_thread_deco(func):
@@ -194,6 +194,94 @@ class User(metaclass=ControlMeta):
             return res
 
 
+class MessageLoop:
+
+    def __init__(self, token):
+        self.token = token
+        # self.loop = asyncio.new_event_loop()
+        # self.session = TokenSession(self.token, driver=HttpDriver(loop=self.loop))
+        # self.vk = API(self.session)
+
+    def create_message_task_(self, auth_user, text):
+        self.loop.create_task(self.create_message(auth_user, text))
+        # self.loop.run_forever()
+        print('СОЗДАН')
+
+    async def create_message_task(self, auth_user, text):
+        await self.queue.put((self.create_message, (auth_user, text,)))
+
+    async def create_message(self, auth_user, text):
+        print('WORK')
+        auth_user.block_template += 1
+        # рандомный сон
+        delay_response_from, delay_response_to = settings['delay_response_from'], settings['delay_response_to']
+
+        random_sleep_answer = random.randint(delay_response_from, delay_response_to)
+        # print(random_sleep_answer)
+
+        await asyncio.sleep(random_sleep_answer)
+
+        # todo Сон для задержки между сообщениями
+
+        # todo доделать last_answer_time
+        # while auth_user.last_answer_time > time.time():
+        #     # print(f'Жду {settings["delay_between_messages"]} сек')
+        #     await asyncio.sleep(settings['delay_between_messages'] + 1)
+
+        auth_user.last_answer_time = time.time() + settings['delay_between_messages']
+
+        # todo доделать ответы между посленими сообщениями
+        await self.vk.messages.setActivity(user_id=auth_user.user_id, type='typing')
+        # await self.vk('messages.set_activity', user_id=user_id, type='typing')#todo
+
+        # рандомный сон
+        delay_typing_from, delay_typing_to = settings['delay_typing_from'], settings['delay_typing_to']
+        random_sleep_typing = random.randint(delay_typing_from, delay_typing_to)
+
+        await asyncio.sleep(random_sleep_typing)
+
+        await self.vk.messages.send(user_id=auth_user.user_id,
+                                    message=text,
+                                    random_id=0)
+
+        USER_LIST[auth_user.user_id].block_template = 0
+
+    async def test(self, x):
+        await asyncio.sleep(2)
+        print('test', x)
+
+    async def main(self):
+        self.session = TokenSession(self.token, driver=HttpDriver(loop=self.loop))
+        self.vk = API(self.session)
+        self.queue = asyncio.Queue()
+        await self.queue.put((self.test, (3,)))
+        while True:
+            print('queue')
+            print(self.queue)
+            await asyncio.sleep(0)
+            func, args = await self.queue.get()
+            print(func, args)
+            # await self.queue.put((self.test,(3,) ))
+            # await func(*args)
+            self.loop.create_task(func(*args))
+            print('СОЗДАН')
+            # await func()
+
+    def create_thread(self):
+        print('Текущий поток', multiprocessing.current_process(), threading.current_thread())  # todo
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        # loop = asyncio.new_event_loop()
+        # self.loop.run_forever()
+        self.loop.create_task(self.main())
+        self.loop.run_forever()
+
+    def run(self):
+        thr = Thread(target=self.create_thread)
+        thr.start()
+        # thr.join()
+
+
 class VkUserControl(metaclass=ControlMeta):
 
     def __init__(self, vk_token, loop=None, ):
@@ -214,12 +302,13 @@ class VkUserControl(metaclass=ControlMeta):
         self.DEFAULT_EVENT_CLASS = Event
         self.info = None
         self.block_message_count = 2
-        self.signal_end = False
         self.message_threads = []
         self.state_answer_count = len(TALK_TEMPLATE) + 4
         self.executor = ThreadPoolExecutor()
         self.table_account = None
+        self.signal_end = False
         self.start_status = True
+        self.message_loop = MessageLoop(self.token)  # todo
 
     def send_status_tg(self, text):
         print('отправка')
@@ -286,10 +375,11 @@ class VkUserControl(metaclass=ControlMeta):
     def start_send_message(self, auth_user, text):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        # print(asyncio.get_event_loop())
 
-        # loop = asyncio.get_event_loop()
-        # print(loop)
+        # self.message_loop = loop
+        # loop.create_task(self.thread_send_message(auth_user, text, loop))
+        # loop.run_forever()
+
         loop.run_until_complete(self.thread_send_message(auth_user, text, loop))
         # loop.run_until_complete(self.thread_send_message2(auth_user, text))
 
@@ -383,17 +473,32 @@ class VkUserControl(metaclass=ControlMeta):
                 not_answer_log.warning(f'{auth_user.user_id} {auth_user.name} --> {text}')
 
             current_answer = f'{answer} {template}'
-
-            table_user = await Users.get(user_id=auth_user.user_id)  # todo
-            await Message.create(user=table_user, received=text, sent_by_bot=current_answer)
-
-            await self._create_message_thread(auth_user, current_answer)  # todo
+            answer = answer or '<ответ не найден>'
+            # if self.send_message_loop:
+            #     print('добавлен в поток')
+            #     self.send_message_loop.create_task(self.thread_send_message(auth_user, text, self.send_message_loop))
+            # else: #TODO
+            # print(self.message_loop.loop)
+            # self.message_loop.create_message_task(auth_user, current_answer)  # todo добавлен send message_loop
+            # await self.message_loop.create_message_task(auth_user, current_answer)  # todo добавлен send message_loop
+            # self.message_loop.loop.create_task(self.message_loop.create_message(auth_user, text))  # todo добавлен send message_loop
+            await self._create_message_thread(auth_user, current_answer)  # todo добавлен send message_loop
             # await self._create_message_executor(auth_user, f'{answer} {template}')
-
         else:
+            answer = 'Игнор/Проверка на номер'
+            template = 'Игнор/Проверка на номер'
             await text_handler(signs['red'],
                                f"{auth_user.user_id} / {auth_user.name} / Стадия 7 или больше / Игнор / Проверка на номер ",
                                'error')
+
+        table_user = await Users.get(user_id=auth_user.user_id)  # todo
+        await Message.create(
+            account=self.table_account,
+            user=table_user,
+            text=text,
+            answer_question=answer,
+            answer_template=template,
+        )
 
     async def block_account_message(self):
         await text_handler(signs['red'], 'Ошибка авторизации!!!', 'error')
@@ -431,7 +536,7 @@ class VkUserControl(metaclass=ControlMeta):
             modules={'models': ['database.apostgresql_tortoise_db']}
         )
         print('проверка норм')
-        self.table_account = await Account.get(user_id = user_id)
+        self.table_account = await Account.get(user_id=user_id)
         while True:
             await asyncio.sleep(5)
             # await self.table_account.connection.
@@ -458,6 +563,7 @@ class VkUserControl(metaclass=ControlMeta):
 
         # func = lambda x, *args: Thread(target=self.create_signals_thread, args=(x, *args,)).start()
         # func(self.check_signals, self.info['id'])
+        # self.message_loop.run()
 
         if TEXT_HANDLER_CONTROLLER['accept_interface']:
             await self.initialization_menu()
@@ -467,6 +573,7 @@ class VkUserControl(metaclass=ControlMeta):
                 async for event_a in self.longpoll.iter():
                     # print(event_a)
                     if event_a[0] != 4:
+                        await asyncio.sleep(0)
                         continue
                     event = self.parse_event(event_a)
                     if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text and event.from_user:
@@ -482,9 +589,19 @@ class VkUserControl(metaclass=ControlMeta):
                             return
 
                         if user in unusers:
-                            await text_handler(signs['red'], f'Новое сообщение от {user} / Черный список / : {text}',
+
+                            auth_user = USER_LIST[user]
+                            await text_handler(signs['red'],
+                                               f'Новое сообщение от {auth_user.name} / Черный список / : {text}',
                                                'error')  # todo
-                            continue
+                            table_user = await Users.get(user_id=auth_user.user_id)  # todo
+                            await Message.create(
+                                account=self.table_account,
+                                user=table_user,
+                                text=text,
+                                answer_question='ПОЛЬЗОВАТЕЛЬ В ЧЕРНОМ СПИСКЕ',
+                                answer_template='ПОЛЬЗОВАТЕЛЬ В ЧЕРНОМ СПИСКЕ',
+                            )
 
                         elif user in users:
                             auth_user = USER_LIST[user]
@@ -507,8 +624,7 @@ class VkUserControl(metaclass=ControlMeta):
 
                                 await res_time_track.stop()
 
-                                table_user = await Users.get(user_id=auth_user.user_id)  # todo
-                                await Message.create(user=table_user, received=text, sent_by_bot='NONE')
+
 
                         else:  # Если нету в базе
                             info = await self.get_user_info(user)
