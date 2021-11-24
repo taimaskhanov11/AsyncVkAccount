@@ -13,6 +13,9 @@ from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Process
 from pprint import pprint
 from threading import Thread
+# from typing import (TYPE_CHECKING, Any, AsyncGenerator,   Awaitable,
+#                     Generator, Generic, Iterator, List, Optional, Type,
+#                     TypeVar, Union)
 
 import aiohttp
 import pandas as pd
@@ -29,27 +32,15 @@ from vk_api.longpoll import Event, VkEventType
 from vk_api.vk_api import VkApiMethod
 
 # from database.database import Numbers, Users
-from database.apostgresql_tortoise_db import Input, Numbers, Users, Account, Message, init_tortoise
+from database.apostgresql_tortoise_db import (Account, Input, Message, Numbers,
+                                              Users, init_tortoise)
 from interface.async_main import async_eel, init_eel, window_update
-from log_settings import exp_log, prop_log, not_answer_log
-from settings import (LOG_COLORS, signs, TEXT_HANDLER_CONTROLLER, TOKENS,
-                      text_handler, VERSION, async_time_track, settings,
-                      time_track, views, TALK_DICT_ANSWER_ALL, TALK_TEMPLATE)
+from log_settings import exp_log, not_answer_log, prop_log
+from settings import (LOG_COLORS, TALK_DICT_ANSWER_ALL, TALK_TEMPLATE,
+                      TEXT_HANDLER_CONTROLLER, TOKENS, VERSION,
+                      async_time_track, log, settings, signs, text_handler,
+                      time_track, views)
 from utilities import find_most_city, search_answer
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    AsyncGenerator,
-    Awaitable,
-    Generator,
-    Generic,
-    Iterator,
-    List,
-    Optional,
-    Type,
-    TypeVar,
-    Union,
-)
 
 # todo
 
@@ -92,7 +83,7 @@ def create_thread_deco(func):
 
     return wrapper
 
-
+@log
 class ResponseTimeTrack:
     def __init__(self):
         self.start_time = time.monotonic()
@@ -106,28 +97,9 @@ class ResponseTimeTrack:
                            off_interface=True, prop=True)
 
 
-class ControlMeta(type):
-    def __new__(mcs, name, bases, attrs, **kwargs):
-        # pprint(attrs)
-        for key, val in attrs.items():
 
-            # todo update for match case
-            if inspect.isfunction(val):
-
-                if key in ('__init__', 'act', 'parse_event', 'start_send_message', 'send_status_tg',
-                           '_start_send_message_executor'):
-                    continue
-                # print(val)
-                if asyncio.iscoroutinefunction(val):
-                    prop_log.debug(f'async {val}')
-                    attrs[key] = async_time_track(val)
-                else:
-                    prop_log.debug(f'sync {val}')
-                    attrs[key] = time_track(val)
-        return super().__new__(mcs, name, bases, attrs, **kwargs)
-
-
-class User(metaclass=ControlMeta):
+@log
+class User:
 
     def __init__(self, user_id, state, name, city):
         self.user_id = user_id
@@ -193,7 +165,7 @@ class User(metaclass=ControlMeta):
             res = random.choice(TALK_TEMPLATE[f"state{self.state}"])
             return res
 
-
+@log
 class MessageLoop:
 
     def __init__(self, token):
@@ -281,8 +253,8 @@ class MessageLoop:
         thr.start()
         # thr.join()
 
-
-class VkUserControl(metaclass=ControlMeta):
+@log
+class VkUserControl:
 
     def __init__(self, vk_token, loop=None, ):
         # super().__init__(*args, **kwargs)

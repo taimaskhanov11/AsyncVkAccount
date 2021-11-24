@@ -8,6 +8,7 @@ from multiprocessing import Process
 from threading import Thread
 
 from peewee import *
+
 from settings import async_time_track, time_track
 
 db_dir = os.path.join(os.path.dirname(__file__), 'users.db')
@@ -95,10 +96,10 @@ class Users(BaseModel):
     async def get_user(cls, user_id):
         return cls.get(user_id=user_id)
 
-    @classmethod
-    @async_time_track
-    async def create(cls, **kwargs):
-        return super(Users, cls).create(**kwargs)
+    # @classmethod
+    # @async_time_track
+    # async def create(cls, **kwargs):
+    #     return super(Users, cls).create(**kwargs)
 
     @classmethod
     @async_time_track
@@ -199,6 +200,7 @@ def runner():
 if __name__ == '__main__':
     db.create_tables([Users, Numbers])
     # Numbers.create_user(random.randint(1, 1000), '2', '3')
+    user = Users.get(user_id=1)
 
     now = time.time()
     # asyncio.run(probe2())

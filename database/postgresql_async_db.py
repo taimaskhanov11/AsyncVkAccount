@@ -6,6 +6,7 @@ from pprint import pprint
 
 import peewee as pw
 from peewee_async import Manager, PostgresqlDatabase
+
 from settings import async_time_track, time_track
 
 postgre_db = PostgresqlDatabase('vk_controller', user='postgres', password='postgres',

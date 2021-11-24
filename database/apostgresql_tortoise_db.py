@@ -5,17 +5,15 @@ import json
 import random
 import statistics
 import time
-
 from pathlib import Path
-
-from aiocache import cached, Cache
 
 from tortoise import Tortoise, fields, run_async
 from tortoise.models import Model
 
-from settings import async_time_track, time_track
+from settings import async_time_track, log
 
 BASE_DIR = Path(__file__)
+
 
 
 def async_time_track1(func):
@@ -32,7 +30,7 @@ def async_time_track1(func):
 
     return surrogate
 
-
+@log
 class Category(Model):
     title = fields.CharField(max_length=255, unique=True, index=True)
     created_at = fields.DatetimeField(auto_now_add=True)
@@ -51,7 +49,7 @@ class Category(Model):
             tuple(input_.text for input_ in category.input), tuple(output.text for output in category.output)
         )
 
-
+@log
 class Input(Model):
     category = fields.ForeignKeyField('models.Category', related_name='input')
     text = fields.CharField(index=True, max_length=255)
@@ -65,7 +63,6 @@ class Input(Model):
         pass
 
     @classmethod
-    @async_time_track
     # @cached(ttl=60, cache=Cache.MEMORY) #todo
     async def find_output(cls, text, city):
         # res = await cls.filter(text__in = text)
@@ -100,6 +97,7 @@ class Input(Model):
     #
 
 
+@log
 class Output(Model):
     category = fields.ForeignKeyField('models.Category', related_name='output')
     text = fields.TextField()
@@ -112,7 +110,7 @@ class Output(Model):
     def create_from_dict(cls):
         pass
 
-
+@log
 class Numbers(Model):
     user_id = fields.IntField(unique=True, index=True)
     name = fields.CharField(default='', max_length=100)
@@ -128,13 +126,13 @@ class Numbers(Model):
         return self.name
 
     @classmethod
-    @async_time_track
     async def change_value(cls, user_id, title, value):
         user = await cls.get(user_id=user_id)
         setattr(user, title, value)
         await user.save()
 
 
+@log
 class Users(Model):
     account = fields.ForeignKeyField('models.Account', related_name='users')
     user_id = fields.IntField(unique=True, index=True)
@@ -152,7 +150,6 @@ class Users(Model):
         return self.name
 
     @classmethod
-    @async_time_track
     async def add_state(cls, user_id):
         user = await cls.get(user_id=user_id)
         user.state += 1
@@ -160,7 +157,6 @@ class Users(Model):
         return user.state
 
     @classmethod
-    @async_time_track
     async def change_value(cls, user_id, title, value):
         user = await cls.get(user_id=user_id)
         setattr(user, title, value)
@@ -179,6 +175,7 @@ class Message(Model):
         table = "app_vk_controller_message"
 
 
+#
 class Account(Model):
     token = fields.CharField(max_length=255)
     name = fields.CharField(max_length=255)
@@ -191,7 +188,6 @@ class Account(Model):
         table = "app_vk_controller_account"
 
     @classmethod
-    @async_time_track
     async def blocking(cls, user_id):
         account = await cls.get(user_id=user_id)
         account.blocked = True

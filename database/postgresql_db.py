@@ -6,6 +6,7 @@ from multiprocessing import Process
 from threading import Thread
 
 from peewee import *
+
 from settings import async_time_track, time_track
 
 pg_db = PostgresqlDatabase('vk_controller', user='postgres', password='postgres',

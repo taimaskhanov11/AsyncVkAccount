@@ -12,7 +12,6 @@ async-Eel==1.0b4
 async-timeout==4.0.1
 asyncmock==0.4.2
 asyncpg==0.24.0
-atlastk==0.12.11
 attrs==21.2.0
 billiard==3.6.4.0
 cachetools~=4.2.4
