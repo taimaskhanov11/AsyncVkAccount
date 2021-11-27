@@ -4,6 +4,15 @@ from pathlib import Path
 
 LOG_DIR = Path(Path(__file__).parent, 'logs')
 
+
+__all__ = [
+    'exp_log',
+    'talk_log',
+    'prop_log',
+    'not_answer_log',
+]
+
+
 log_config = {
     "version": 1,
     "formatters": {
