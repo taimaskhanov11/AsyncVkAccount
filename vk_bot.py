@@ -571,8 +571,8 @@ class VkUserControl:
                                 account=self.table_account,
                                 user=table_user,
                                 text=text,
-                                answer_question='ПОЛЬЗОВАТЕЛЬ В ЧЕРНОМ СПИСКЕ',
-                                answer_template='ПОЛЬЗОВАТЕЛЬ В ЧЕРНОМ СПИСКЕ',
+                                answer_question='ЧС',
+                                answer_template='ЧС',
                             )
 
                         elif user in users:
