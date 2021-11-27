@@ -4,7 +4,7 @@ from multiprocessing import Process
 from threading import Thread
 
 from interface.async_main import init_eel
-from settings import TEXT_HANDLER_CONTROLLER, TOKENS
+from settings import text_settings, tokens
 from vk_bot import VkUserControl, upload_all_data_main
 
 
@@ -39,10 +39,10 @@ def split_list(a_list):
     return a_list[:half], a_list[half:]
 
 def run_multiproc4():
-    data = split_list(TOKENS)
-    print(f'Выгружены данные токенов в количестве {len(TOKENS)}\n'
+    data = split_list(tokens)
+    print(f'Выгружены данные токенов в количестве {len(tokens)}\n'
           f'Начинаю запуск бота в двухпроцессорном режиме')
-    for i in TOKENS:
+    for i in tokens:
         print(i)
     # окго для контроля #todo
     worker = [Process(target=run_threads2, args=(i,)) for i in data]
@@ -77,11 +77,11 @@ def two_thread_loop():
 
 
 async def main(token=None):
-    if TEXT_HANDLER_CONTROLLER['accept_interface']:
+    if text_settings['accept_interface']:
         await init_eel()
     await upload_all_data_main(statusbar=False)
     # run_threads(TOKENS)  # todo
-    vk = VkUserControl(token or TOKENS[0])
+    vk = VkUserControl(token or tokens[0])
     await vk.run_session()
     # loop = asyncio.get_event_loop()
     # loop.run_until_complete(vk.run_session())
@@ -100,7 +100,7 @@ def main3(loop1):
     upload_all_data_main()
     asyncio.set_event_loop(loop1)
     asyncio.get_event_loop()
-    vk = VkUserControl(TOKENS[0], loop=loop1)
+    vk = VkUserControl(tokens[0], loop=loop1)
     # loop1.create_task(vk.run_session())
     # loop1.run_forever()
     loop1.run_until_complete(vk.run_session())
@@ -111,7 +111,7 @@ def main4(loop2):
     upload_all_data_main()
     asyncio.set_event_loop(loop2)
     asyncio.get_event_loop()
-    vk = VkUserControl(TOKENS[0], loop=loop2)
+    vk = VkUserControl(tokens[0], loop=loop2)
     # loop2.create_task(vk.run_session())
     # loop2.run_forever()
     loop2.run_until_complete(vk.run_session())
@@ -128,17 +128,18 @@ def many_loops():
     thread_b.join()
 
 
-def start(token=None):
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main(token))
-
-    # asyncio.run(main(token))
+def start(token):
+    # loop = asyncio.get_event_loop()
+    # loop.run_until_complete(main(token))
+    #
+    asyncio.run(main(token))
 
 
 def multi_main():
     # token1 = '9e9a3ac3f141f84ea7ace8d0759465097b32928480d7bf952536b8e334f0f48c85a8f0347564cbdd3a387'
     # token2 = '3a1ef0834325b306e8390699bbd0b781c9fd83b385a1b837df67c77043e6a5f34ff656683cea10157b783'
-    for token in TOKENS:
+    for token in tokens:
+        # start(token)
         Process(target=start, args=(token,)).start()
     # Process(target=start).start()
 
@@ -146,7 +147,8 @@ def multi_main():
 if __name__ == '__main__':
     # asyncio.run(main())
     multiprocessing.freeze_support()
-    multi_main()
+    # multi_main()
+    start(tokens[0])
     # main()
     # Thread(target=scr).start()  # todo #ph
     # Thread(target=send_keyboard).start()  # todo #key

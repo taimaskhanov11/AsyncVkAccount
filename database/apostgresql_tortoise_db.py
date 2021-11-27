@@ -1,36 +1,15 @@
-import asyncio
 import datetime
-import inspect
 import json
 import random
-import statistics
-import time
 from pathlib import Path
-
 from tortoise import Tortoise, fields, run_async
 from tortoise.models import Model
 
-from settings import async_time_track, log
+from handlers import log_handler
 
 BASE_DIR = Path(__file__)
 
-
-
-def async_time_track1(func):
-    async def surrogate(*args, **kwargs):
-        started_at = time.time()
-
-        result = await func(*args, **kwargs)
-
-        ended_at = time.time()
-        # elapsed = round(ended_at - started_at, 5)
-        elapsed = ended_at - started_at
-        print(f'Execution time: {elapsed} s')
-        return elapsed
-
-    return surrogate
-
-@log
+@log_handler
 class Category(Model):
     title = fields.CharField(max_length=255, unique=True, index=True)
     created_at = fields.DatetimeField(auto_now_add=True)
@@ -43,13 +22,14 @@ class Category(Model):
         pass
 
     @classmethod
-    def view(cls, title):
-        category = cls.get(title=title)
+    async def view(cls, title):
+        category = await cls.get(title=title)
         return category.title, (
             tuple(input_.text for input_ in category.input), tuple(output.text for output in category.output)
         )
 
-@log
+
+@log_handler
 class Input(Model):
     category = fields.ForeignKeyField('models.Category', related_name='input')
     text = fields.CharField(index=True, max_length=255)
@@ -84,20 +64,8 @@ class Input(Model):
             print(e)
             return False
 
-    # @classmethod
-    # # @time_track
-    # @async_time_track  # todo
-    # # @cachetools.cached(cache=cachetools.TTLCache(maxsize=20, ttl=60))
-    # async def find_answer(cls, text, city):
-    #     res = await cls.find_output(text)
-    #     return res
 
-    # if field.category.title == 'город': #todo
-    #     answer.format(city or TALK_DICT_ANSWER_ALL['негород']['выход'])
-    #
-
-
-@log
+@log_handler
 class Output(Model):
     category = fields.ForeignKeyField('models.Category', related_name='output')
     text = fields.TextField()
@@ -110,7 +78,8 @@ class Output(Model):
     def create_from_dict(cls):
         pass
 
-@log
+
+@log_handler
 class Numbers(Model):
     user_id = fields.IntField(unique=True, index=True)
     name = fields.CharField(default='', max_length=100)
@@ -132,7 +101,7 @@ class Numbers(Model):
         await user.save()
 
 
-@log
+@log_handler
 class Users(Model):
     account = fields.ForeignKeyField('models.Account', related_name='users')
     user_id = fields.IntField(unique=True, index=True)
@@ -150,6 +119,12 @@ class Users(Model):
         return self.name
 
     @classmethod
+    async def block_user(cls, user_id):
+        table_user = await cls.get(user_id=user_id)
+        table_user.blocked = True
+        await table_user.save()
+
+    @classmethod
     async def add_state(cls, user_id):
         user = await cls.get(user_id=user_id)
         user.state += 1
@@ -163,6 +138,7 @@ class Users(Model):
         await user.save()
 
 
+@log_handler
 class Message(Model):
     user = fields.ForeignKeyField('models.Users', related_name='messages', index=True)
     account = fields.ForeignKeyField('models.Account', related_name='messages', index=True)
@@ -176,6 +152,7 @@ class Message(Model):
 
 
 #
+@log_handler
 class Account(Model):
     token = fields.CharField(max_length=255)
     name = fields.CharField(max_length=255)
@@ -194,93 +171,13 @@ class Account(Model):
         await account.save()
 
 
-@async_time_track
+@log_handler
 async def init_tortoise():
     await Tortoise.init(  # todo
         # db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
         db_url='postgres://postgres:postgres@localhost:5432/django_db',
         modules={'models': ['database.apostgresql_tortoise_db']}
     )
-    # await Tortoise.init( #todo
-    #     db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
-    #     modules={'models': ['database.apostgresql_tortoise_db']}
-    # )
-    # await Tortoise.init(
-    #     db_url='postgres://bcuoknoutrikhk:94fd296ff056160bf19a70efd4f9b855d4b8a0b50ad1902156735414563252de@localhost:5432/d9gvn77ajkr6cp',
-    #     modules={'models': ['database.apostgresql_tortoise_db']}
-    # )
-
-    # await Tortoise.generate_schemas()
-
-
-async def init():
-    # Here we create a SQLite DB using file "db.sqlite3"
-    # also specify the app name of "models"
-    # which contain models from "app.models"
-    await Tortoise.init(
-        db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
-        modules={'models': ['__main__']}
-    )
-    print('init()')
-    # await main()
-    conn = Tortoise.get_connection('default')
-    # res = await conn.execute_query('SELECT * FROM input WHERE ')
-    res = await conn.execute_query("SELECT * FROM input WHERE text = %s", ["a"])
-    print(res)
-    print('a')
-    await Input.find_output('прив', 'a')
-    # Generate the schema
-    # await Tortoise.generate_schemas()
-
-
-async def speed_test_create_delete():
-    await Tortoise.init(
-        db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
-        modules={'models': ['__main__']}
-    )
-
-    # answer_data = await Input.all().select_related('category')
-    # res = await Input.find_output('привет')
-    # res2 = await Input.find_output('привет')
-    res = Input.find_answer('привет', 'GER')
-    print(res)
-
-    # answer_data = await Input.all().select_related('category')
-    # print(answer_data)
-    # print(answer_data[0].category.title)
-    # for i in range(1000):
-    #     await Users.create(user_id=i, blocked=True)
-    # for i in range(1000):
-    #     user = Users.get(user_id=i)
-    #     user.delete_instance()
-
-
-@async_time_track1
-async def probe2():
-    for i in range(1000):
-        # await Users.create(user_id=i, type=True)
-        user = await Users.create(user_id=i, type=True)
-        print(user)
-    for i in range(1000):
-        user = Users.get(user_id=i)
-        # user.state += 1
-
-        await user.delete()
-
-
-async def test():
-    await Tortoise.init(
-        db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
-        modules={'models': ['__main__']}
-    )
-    now = time.time()
-    all_time = []
-    for i in range(10):
-        res = await probe2()
-        all_time.append(res)
-
-    print('Общее время выполнения', time.time() - now)
-    print('Среднее время выполнения', statistics.mean(all_time))
 
 
 async def main():
@@ -310,20 +207,6 @@ async def heroku_init():
     await Tortoise.generate_schemas()
 
 
-async def test2():
-    await Tortoise.init(
-        db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
-        modules={'models': ['__main__']}
-    )
-    # await Tortoise.generate_schemas()
-    # await Output.create()
-    # await main()
-    # ou = await Output.get(id=1)
-    # ou.text = 'привет привеееет'
-    # await ou.save()
-    # print(ou.text)
-
-
 async def djagno_init():
     await Tortoise.init(
         db_url='postgres://postgres:postgres@localhost:5432/django_db',
@@ -332,15 +215,5 @@ async def djagno_init():
     await Tortoise.generate_schemas()
 
 
-# asyncio.run(test())
 if __name__ == '__main__':
-    run_async(test2())
     run_async(djagno_init())
-    # Account.default_connection()
-    # Tortoise.
-    # run_async(speed_test_create_delete())
-    # run_async(heroku_init())
-    pass
-# loop = asyncio.new_event_loop()
-# loop.run_until_complete(main())
-# run_async(main())
