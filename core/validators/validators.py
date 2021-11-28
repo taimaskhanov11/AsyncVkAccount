@@ -1,4 +1,6 @@
-from handlers import log_handler
+import sys
+
+from core.handlers.log_handler import log_handler
 
 __all__ = [
     'photo_validator',
@@ -6,8 +8,6 @@ __all__ = [
     'mens_validator',
     'count_friends_validator'
 ]
-
-import sys
 
 
 def photo_validator(photo) -> bool:
@@ -56,4 +56,3 @@ current_module = sys.modules[__name__]
 for v_name in __all__:
     v = getattr(current_module, v_name)
     setattr(current_module, v_name, log_handler(v))
-

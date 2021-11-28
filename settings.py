@@ -1,9 +1,8 @@
-
 from pathlib import Path
 
 import json
 
-from polog import config, file_writer
+# from polog import config, file_writer
 
 
 __all__ = [
@@ -19,7 +18,9 @@ __all__ = [
 ]
 
 BASE_DIR = Path(__file__).parent
-config.add_handlers(file_writer(str(Path(BASE_DIR, 'logs/new_log.log'))))
+
+
+# config.add_handlers(file_writer(str(Path(BASE_DIR, 'logs/new_log.log'))))
 
 
 def read_json(path, encoding='utf-8-sig'):
@@ -43,7 +44,9 @@ signs = {
     "mark": "[✓]",
     "magenta": "►",
     "time": "⌛",
-    "version": "∆"
+    "version": "∆",
+    "queue": '•‣',
+    "message": '✉'
 }
 
 log_colors = {
@@ -52,8 +55,3 @@ log_colors = {
     "error": ["red", "✖"],
     "debug": ["white", "இ"]
 }
-
-
-
-
-

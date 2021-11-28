@@ -1,8 +1,7 @@
 import logging.config
-
 from pathlib import Path
 
-LOG_DIR = Path(Path(__file__).parent, 'logs')
+LOG_DIR = Path(Path(__file__).parent, '../logs')
 
 
 __all__ = [

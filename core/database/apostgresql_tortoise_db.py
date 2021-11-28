@@ -2,14 +2,27 @@ import datetime
 import json
 import random
 from pathlib import Path
+
 from tortoise import Tortoise, fields, run_async
 from tortoise.models import Model
 
-from handlers import log_handler
+from core.handlers.log_handler import log_handler
 
 BASE_DIR = Path(__file__)
 
-@log_handler
+__all__ = [
+    'Tortoise',
+    'Category',
+    'Input',
+    'Output',
+    'Numbers',
+    'Users',
+    'Message',
+    'Account',
+    'init_tortoise',
+]
+
+
 class Category(Model):
     title = fields.CharField(max_length=255, unique=True, index=True)
     created_at = fields.DatetimeField(auto_now_add=True)
@@ -29,7 +42,6 @@ class Category(Model):
         )
 
 
-@log_handler
 class Input(Model):
     category = fields.ForeignKeyField('models.Category', related_name='input')
     text = fields.CharField(index=True, max_length=255)
@@ -65,7 +77,6 @@ class Input(Model):
             return False
 
 
-@log_handler
 class Output(Model):
     category = fields.ForeignKeyField('models.Category', related_name='output')
     text = fields.TextField()
@@ -79,7 +90,6 @@ class Output(Model):
         pass
 
 
-@log_handler
 class Numbers(Model):
     user_id = fields.IntField(unique=True, index=True)
     name = fields.CharField(default='', max_length=100)
@@ -101,7 +111,6 @@ class Numbers(Model):
         await user.save()
 
 
-@log_handler
 class Users(Model):
     account = fields.ForeignKeyField('models.Account', related_name='users')
     user_id = fields.IntField(unique=True, index=True)
@@ -138,7 +147,6 @@ class Users(Model):
         await user.save()
 
 
-@log_handler
 class Message(Model):
     user = fields.ForeignKeyField('models.Users', related_name='messages', index=True)
     account = fields.ForeignKeyField('models.Account', related_name='messages', index=True)
@@ -152,7 +160,7 @@ class Message(Model):
 
 
 #
-@log_handler
+
 class Account(Model):
     token = fields.CharField(max_length=255)
     name = fields.CharField(max_length=255)
@@ -171,12 +179,11 @@ class Account(Model):
         await account.save()
 
 
-@log_handler
 async def init_tortoise():
     await Tortoise.init(  # todo
         # db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
         db_url='postgres://postgres:postgres@localhost:5432/django_db',
-        modules={'models': ['database.apostgresql_tortoise_db']}
+        modules={'models': ['core.database.apostgresql_tortoise_db']}
     )
 
 
@@ -214,6 +221,9 @@ async def djagno_init():
     )
     await Tortoise.generate_schemas()
 
+
+log_handler.init_choice_logging(__name__,
+                                *__all__)
 
 if __name__ == '__main__':
     run_async(djagno_init())
