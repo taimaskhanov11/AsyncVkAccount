@@ -332,9 +332,7 @@ class VkUserControl:
 
             current_answer = f'{answer} {template}'
             answer = answer or '<ответ не найден>'
-            # print('создаем задачу')
             asyncio.create_task(self.send_delay_message(auth_user, current_answer))
-
         else:
             answer = 'Игнор/Проверка на номер'
             template = 'Игнор/Проверка на номер'
@@ -489,6 +487,7 @@ class VkUserControl:
             elif auth_user.block_template < self.block_message_count:
                 await asyncio.gather(
                     self.create_response(text, auth_user, table_user),
+
                     asyncio.to_thread(text_handler(signs['green'],
                                                    f'Новое сообщение от {auth_user.name} / {user_id} - {text}',
                                                    'info'))  # todo
@@ -593,7 +592,7 @@ def is_bad_proxy(pip):
         return True
     return False
 
-
+@log_handler
 async def upload_all_data_main(statusbar=False):
     """Инициализация данных профиля и сохранений в базе"""
     try:

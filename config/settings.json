@@ -16,8 +16,8 @@
     "YBJ4Eq:u5HmBf@217.29.62.158:14866",
     "YBJ4Eq:u5HmBf@217.29.62.158:14866"
   ],
-  "delay_response_from": 10,
-  "delay_response_to": 15,
+  "delay_response_from": 2,
+  "delay_response_to": 5,
 
   "delay_typing_from": 0,
   "delay_typing_to": 0,

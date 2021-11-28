@@ -171,13 +171,16 @@ def func_handler(func):
         func_name = f'{path}/{func.__name__}'
         sync_text_handler(signs['time'], f'{func_name:<36} {execute_time} | sync', 'debug',
                           off_interface=True, talk=False, prop=True)
+        return res
 
     if inspect.iscoroutinefunction(func):
         return async_wrapper
+
     return sync_wrapper
 
 
 # Configure time track
+
 def answer_cache(func, data):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -213,28 +216,28 @@ class Router:
 
     def __call__(self, *args, **kwargs):
         # print(args)
+
         def decorator(obj):
+            # print(obj)
+            # print(inspect.isfunction(obj), obj)
             if inspect.isfunction(obj):
+                # print(obj)
                 return func_handler(obj)
             else:
                 all_methods = [func for func in dir(obj) if
                                callable(getattr(obj, func)) and (not func.startswith('__') and not func.endswith('__'))]
                 # print(all_methods)
-                # print(Class)
+                # for method_name in all_methods:
+                #     print(method_name)
 
                 for method_name in all_methods:
-                    # print(method_name)
                     method = getattr(obj, method_name)
-                    if inspect.iscoroutinefunction(method):
-                        # print(method)
-                        new_method = async_time_track(method)
+                    # print(method)
+                    if inspect.isfunction(method):
+                        # print(method_name)
+                        new_method = func_handler(method)
                         setattr(obj, method_name, new_method)
-                    else:
-                        print(method)
-                        new_method = time_track(method)
-                        setattr(obj, method_name, new_method)
-
-                    return obj
+                return obj
 
         if not len(args):
             return decorator
