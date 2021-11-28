@@ -119,7 +119,7 @@ class VkUserControl:
         self.users_block = collections.defaultdict(int)
         self.DEFAULT_EVENT_CLASS = Event
         self.info = None
-        self.block_message_count = 20
+        self.block_message_count = 3
         self.message_threads = []
         self.state_answer_count = len(conversation_stages) + 4
         self.executor = ThreadPoolExecutor()
