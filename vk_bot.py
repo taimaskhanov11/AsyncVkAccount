@@ -4,150 +4,93 @@ import multiprocessing
 import random
 import threading
 import time
-import urllib.error
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from threading import Thread
 
 import telebot
 from aiovk import API, TokenSession
-from aiovk.drivers import HttpDriver
 from aiovk.exceptions import VkAuthError
 from aiovk.longpoll import UserLongPoll
 from colorama import init as colorama_init
-from tortoise import Tortoise
 from tqdm import trange
 from vk_api.longpoll import Event, VkEventType
 
-from core.classes import BaseUser
-from core.database import (Account, Input, Message, Users,
-                           init_tortoise)
-from core.handlers.text_handler import text_handler
+from core.classes import BaseUser, ResponseTimeTrack
+from core.context.log_message import LogMessage
+from core.database import Account, Input, Message, Users, init_tortoise
 from core.handlers.log_handler import log_handler
+from core.handlers.text_handler import text_handler
 from core.log_settings import exp_log, not_answer_log
 from core.utils import find_most_city
 from core.validators import (age_validator, count_friends_validator,
                              mens_validator, photo_validator)
 from settings import *
 
-# from typing import (TYPE_CHECKING, Any, AsyncGenerator,   Awaitable,
-#                     Generator, Generic, Iterator, List, Optional, Type,
-#                     TypeVar, Union)
-
-# todo
-
-
-# BaseUser = log_handler(BaseUser)
-
+colorama_init()
 
 __all__ = [
-    'upload_sql_users',
     'ResponseTimeTrack',
     'VkUserControl',
     'upload_all_data_main',
 ]
 
 
-users = []
-unusers = []
-user_list = {}
-colorama_init()
-
-
-async def upload_sql_users():  # todo
-    users_all = await Users.all()
-    for user in users_all:
-        _id = user.user_id
-        user_list[_id] = BaseUser(_id, user.state, user.name, user.city)
-        if user.blocked:
-            unusers.append(_id)
-            # print(USER_LIST)
-        else:
-            users.append(_id)
-
-
-def create_thread_deco(func):
-    # @functools.wraps(func)
-    print(func.__name__)
-
-    def run(function, *args):
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(function(*args))
-
-    async def wrapper(*args, **kwargs):
-        print(args)
-        # func = functools.partial(*args, **kwargs)
-        Thread(target=run, args=(func, *args)).start()
-        text_handler(signs['time'], f'{func.__name__:<36} запущен поток проверки состояния', 'debug',
-                     off_interface=True, talk=False, prop=True)
-        # await func(*args, **kwargs)
-
-    return wrapper
-
-
-class ResponseTimeTrack:
-    def __init__(self):
-        self.start_time = time.monotonic()
-
-    def stop(self, check=False):
-        end_time = time.monotonic()
-        check_time_end = round(end_time - self.start_time, 6)
-        text = f'Время полной проверки {check_time_end}s' if check else f'Время формирования ответа {check_time_end} s'
-
-        text_handler(signs['time'], text, 'debug', color='blue',
-                     off_interface=True, prop=True)
-
-
-# @log_handler
 class VkUserControl:
     validators = (photo_validator, age_validator, count_friends_validator, mens_validator)
 
     def __init__(self, vk_token):
-        # super().__init__(*args, **kwargs)
-
         self.token = vk_token
-        # self.session = vk_api.VkApi(token=token, api_version='5.131')
-        # self.session = TokenSession(self.token)
         self.loop = asyncio.get_event_loop()
         # self.driver = HttpDriver(loop=loop) if loop else None
-        # self.session = TokenSession(self.token, driver=self.driver)
         self.session = TokenSession(self.token)
         self.tg_bot = telebot.TeleBot(settings['telegram_token'])
         self.vk = API(self.session)
+
+        self.users_objects = {}
+        self.verified_users = []
+        self.unverified_users = []
+
+        self.verifying_users = []
+
+        self.logger = LogMessage()  # todo
 
         self.longpoll = UserLongPoll(self.vk, mode=1, version=3)
         self.users_block = collections.defaultdict(int)
         self.DEFAULT_EVENT_CLASS = Event
         self.info = None
-        self.block_message_count = 3
-        self.message_threads = []
-        self.state_answer_count = len(conversation_stages) + 4
+        self.table_account = None  # init in get_self_info
         self.executor = ThreadPoolExecutor()
-        self.table_account = None
         self.signal_end = False
         self.start_status = True
+
+        self.state_answer_count = len(conversation_stages) + 4
+        self.block_message_count = settings['block_message_count']
+        self.delay_for_users = (settings['delay_response_from'], settings['delay_response_to'])
         self.delay_typing = (settings['delay_typing_from'], settings['delay_typing_to'])
-        self.acc_delay = settings['delay_between_messages_for_account']
-
-
+        self.delay_for_acc = settings['delay_between_messages_for_account']
 
         self.message_queue = asyncio.Queue()
 
-    def send_status_tg(self, text):
+    async def unloading_from_database(self):  # todo
+        users_all = await Users.all()
+        for user in users_all:
+            _id = user.user_id
+            self.users_objects[_id] = BaseUser(_id, user.state, user.name, user.city)
+            if user.blocked:
+                self.unverified_users.append(_id)
+            else:
+                self.verified_users.append(_id)
+
+    def send_status_tg(self, text: str) -> None:
         print('отправка')
         self.tg_bot.send_message(settings['user_id'], text)
 
-    async def get_user_info(self, user_id):
+    async def get_user_info(self, user_id: int) -> dict:
         # res = await self.vk.users.get(user_ids=user_id, fields=['bdate', 'sex', 'has_photo', 'city'])
         res = await self.vk.users.get(user_ids=user_id,
                                       fields='sex, bdate, has_photo, city')
         return res[0]
 
-
-
-
-
-    async def send_message(self, user_id, text):
+    async def send_message(self, user_id: int, text: str) -> None:
         await self.vk.messages.setActivity(user_id=user_id, type='typing')
         await asyncio.sleep(random.randint(*self.delay_typing))
 
@@ -155,68 +98,11 @@ class VkUserControl:
                                     message=text,
                                     random_id=0)
 
-
     async def get_friend(self, user_id):
         return await self.vk.friends.search(user_id=user_id, fields="sex, city", count=1000)
 
-    async def add_friend(self, user_id):
-        await self.vk.friends.add(user_id=user_id)
-
     def check_and_add_friend(self, user_id):  # todo
         pass
-
-        # await loop.run_in_executor(self.executor, self.thread_send_message, auth_user, current_answer)
-
-    async def _create_message_thread(self, auth_user, current_answer):  # todo
-        task = Thread(target=self.start_send_message, args=(auth_user, current_answer))
-        self.message_threads.append(task)
-        task.start()
-
-    def start_send_message(self, auth_user, text):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        # self.message_loop = loop
-        # loop.create_task(self.thread_send_message(auth_user, text, loop))
-        # loop.run_forever()
-
-        loop.run_until_complete(self.thread_send_message(auth_user, text, loop))
-        # loop.run_until_complete(self.thread_send_message2(auth_user, text))
-
-    async def thread_send_message(self, auth_user, text, loop):
-        # async with TokenSession(self.token) as session:
-        async with TokenSession(self.token, driver=HttpDriver(loop=loop)) as session:
-            # session =
-            vk = API(session)
-            auth_user.block_template += 1
-            # рандомный сон
-            delay_response_from, delay_response_to = settings['delay_response_from'], settings['delay_response_to']
-
-            random_sleep_answer = random.randint(delay_response_from, delay_response_to)
-            # print(random_sleep_answer)
-
-            await asyncio.sleep(random_sleep_answer)
-
-            # todo Сон для задержки между сообщениями
-
-            # todo доделать last_answer_time
-            # while auth_user.last_answer_time > time.time():
-            #     # print(f'Жду {settings["delay_between_messages"]} сек')
-            #     await asyncio.sleep(settings['delay_between_messages'] + 1)
-            # auth_user.last_answer_time = time.time() + settings['delay_between_messages']
-
-            # todo доделать ответы между посленими сообщениями
-            await vk.messages.setActivity(user_id=auth_user.user_id, type='typing')
-            # await self.vk('messages.set_activity', user_id=user_id, type='typing')#todo
-
-            # рандомный сон
-            await asyncio.sleep(random.randint(*self.delay_typing))
-
-            await vk.messages.send(user_id=auth_user.user_id,
-                                   message=text,
-                                   random_id=0)
-
-        user_list[auth_user.user_id].block_template = 0
 
     def user_info_view(self, info, count_friend, age, has_photo):
         text_handler(signs['yellow'], f"{info['first_name']}, {info['last_name']}, {info['id']}", 'warning')
@@ -235,42 +121,21 @@ class VkUserControl:
         )
         self.table_account = table_account[0]
 
-    def parse_event(self, raw_event):
+    def parse_event(self, raw_event) -> Event:
         return self.DEFAULT_EVENT_CLASS(raw_event)
 
-    async def send_delay_message(self, auth_user, text):
+    async def send_delaying_message(self, auth_user: BaseUser, text: str):
         auth_user.block_template += 1
         # рандомный сон
-        delay_response_from, delay_response_to = settings['delay_response_from'], settings['delay_response_to']
-
-        random_sleep_answer = random.randint(delay_response_from, delay_response_to)
-
+        random_sleep_answer = random.randint(*self.delay_for_users)
         await asyncio.sleep(random_sleep_answer)
-
-        # todo Сон для задержки между сообщениями
-
         # todo доделать last_answer_time
-        # while auth_user.last_answer_time > time.time():
-        #     # print(f'Жду {settings["delay_between_messages"]} сек')
-        #     await asyncio.sleep(settings['delay_between_messages'] + 1)
-        # auth_user.last_answer_time = time.time() + settings['delay_between_messages'] #TODO
-
-        # todo доделать ответы между посленими сообщениями
-        # await self.vk('messages.set_activity', user_id=user_id, type='typing')#todo
-
-        # рандомный сон
-
-
         await self.message_queue.put((auth_user.user_id, auth_user.name, text))
-        # await self.send_message(auth_user.user_id, text) #todo
 
-        # user_list[auth_user.user_id].block_template = 0
-
-    async def create_response(self, text, auth_user, table_user):
+    async def create_answer(self, text: str, auth_user: BaseUser, table_user: Users):
 
         template = await auth_user.act(text, self)  # todo
         if template:
-
             answer = await Input.find_output(text, auth_user.city)
             if not answer:
                 await asyncio.to_thread(
@@ -280,7 +145,7 @@ class VkUserControl:
             current_answer = f'{answer} {template}'
             answer = answer or '<ответ не найден>'
 
-            asyncio.create_task(self.send_delay_message(auth_user, current_answer))
+            asyncio.create_task(self.send_delaying_message(auth_user, current_answer))
 
         else:
             answer = 'Игнор/Проверка на номер'
@@ -300,9 +165,9 @@ class VkUserControl:
 
     async def update_users(self, user_id, name, mode=True, city=None):  # todo убрать
         table_user = await Users.create(account=self.table_account, user_id=user_id, name=name, city=city)
-        user_list[user_id] = BaseUser(user_id, 0, name, city)
-        users.append(user_id) if mode else unusers.append(user_id)
-        return user_list[user_id], table_user
+        self.users_objects[user_id] = BaseUser(user_id, 0, name, city)
+        self.verified_users.append(user_id) if mode else self.unverified_users.append(user_id)
+        return self.users_objects[user_id], table_user
 
     # todo проверка состояния
     def create_signals_thread(self, func, *args):
@@ -310,16 +175,10 @@ class VkUserControl:
         asyncio.set_event_loop(loop)
         loop.run_until_complete(func(*args))
 
-    async def check_signals(self, user_id):
-        await Tortoise.init(  # todo
-            db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
-            modules={'models': ['database.apostgresql_tortoise_db']}
-        )
-        print('проверка норм')
-        self.table_account = await Account.get(user_id=user_id)
+    async def check_signals(self):
         while True:
             await asyncio.sleep(5)
-            # await self.table_account.connection.
+
             await self.table_account.refresh_from_db(fields=['start_status'])
             if self.start_status:
                 if not self.table_account.start_status:
@@ -328,7 +187,7 @@ class VkUserControl:
                 if self.table_account.start_status:
                     self.start_status = True
 
-    async def check_friend_status(self, user_id, can_access_closed):
+    async def check_friend_status(self, user_id: int, can_access_closed: bool) -> bool:
         add_status = await self.vk.friends.areFriends(user_ids=user_id)
         add_status = add_status[0]['friend_status']
 
@@ -339,40 +198,27 @@ class VkUserControl:
                 asyncio.to_thread(
                     text_handler, signs['yellow'], f"Добавление в друзья", 'warning'
                 ),
-                self.add_friend(user_id)
+                self.vk.friends.add(user_id=user_id)
             )
             return True
-
         if not can_access_closed:
-            if add_status == 0:
-                self.users_block[user_id] += 1
-                if self.users_block[user_id] > 2:
-                    return False
-                await self.send_message(user_id, random.choice(
-                    ai_logic['private']['выход']))
-
-            elif add_status == 1:
-                await self.send_message(user_id,
-                                        "было бы круто если бы ты принял заявку в друзья &#128522;")
-                return False
-
+            match add_status:
+                case 0:
+                    await self.send_message(user_id, random.choice(
+                        ai_logic['private']['выход']))
+                case 1:
+                    await self.send_message(user_id, "было бы круто если бы ты принял заявку в друзья &#128522;")
+            return False
         return True
 
-    async def check_user_validity(self, user_id, info, name, text) -> bool:
+    async def check_user_validity(self, user_id, info, name) -> bool | tuple[BaseUser, Users]:
         friend_list = await self.get_friend(user_id)
-
         m_f_count = [i['sex'] for i in friend_list['items']]
-        female = m_f_count.count(1)
-        male = m_f_count.count(2)
-        age = info.get('bdate')
-        has_photo = info['has_photo']
-        count_friend = friend_list['count']
-
+        female, male, age = m_f_count.count(1), m_f_count.count(2), info.get('bdate')
+        has_photo, count_friend = info['has_photo'], friend_list['count']
         await asyncio.to_thread(self.user_info_view, info, count_friend, age, has_photo)
 
-        valid = await self.all_validators(has_photo, age, count_friend,
-                                          (male, female, count_friend), )
-
+        valid = await self.all_validators(has_photo, age, count_friend, (male, female, count_friend), )
         if valid:
             # поиск города
             city = find_most_city(friend_list)
@@ -382,20 +228,18 @@ class VkUserControl:
                                     f'{user_id} / {name} / Прошел все проверки / Добавлен в users',
                                     'info')
 
-            await self.create_response(text, auth_user, table_user)
-
-            return True
+            return auth_user, table_user
         else:
-            await asyncio.gather(self.update_users(user_id, name, False),
-                                 asyncio.to_thread(text_handler,
-                                                   signs['red'],
-                                                   f'{user_id} {name} Проверку не прошел / Добавлен в unusers',
-                                                   'error')
-                                 )
+            await asyncio.gather(
+                self.update_users(user_id, name, False),
+                asyncio.to_thread(text_handler,
+                                  signs['red'],
+                                  f'{user_id} {name} Проверку не прошел / Добавлен в unusers',
+                                  'error')
+            )
             return False
 
-    async def save_message(self, table_user, text, answer_question, answer_template):
-
+    async def save_message(self, table_user: Users, text: str, answer_question: str, answer_template: str) -> None:
         await Message.create(
             account=self.table_account,
             user=table_user,
@@ -404,85 +248,100 @@ class VkUserControl:
             answer_template=answer_template,
         )
 
-    def blacklist_message(self, auth_user, text):
+    def blacklist_message(self, auth_user: BaseUser, text: str) -> None:
         text_handler(signs['red'],
-                     f'Новое сообщение от {auth_user.name} / Черный список / : {text}',
+                     f'Новое сообщение от {auth_user.name}/Черный список/: {text}',
                      'error')
 
-    async def run(self, event):
+    async def create_response(self, text: str, user_id: int) -> None:
+        auth_user = self.users_objects[user_id]
+        table_user = await Users.get(user_id=auth_user.user_id)  # todo
+        if auth_user.state > self.state_answer_count:
+            self.unverified_users.append(auth_user.user_id)
+            await asyncio.gather(
+                Users.block_user(auth_user.user_id),
+                asyncio.to_thread(self.blacklist_message, auth_user, text)
+            )
+
+        elif auth_user.block_template < self.block_message_count:
+            await asyncio.gather(
+                self.create_answer(text, auth_user, table_user),
+                asyncio.to_thread(text_handler(signs['green'],
+                                               f'Новое сообщение от {auth_user.name} / {user_id} - {text}',
+                                               'info'))  # todo
+            )
+
+        else:
+            await asyncio.gather(
+                asyncio.to_thread(text_handler, signs['yellow'],
+                                  f'Новое сообщение от {auth_user.name} /{user_id}/SPAM  - {text}',
+                                  'warning'),  # todo
+                self.save_message(table_user, text, 'блок', 'блок')
+            )
+
+    async def verify_user(self, user_id, text) -> bool | tuple[BaseUser, Users]:
+        info = await self.get_user_info(user_id)
+        name = info['first_name']
+
+        await asyncio.to_thread(text_handler, signs['green'],
+                                f'Новое сообщение от {name}/{user_id}/Нету в базе - {text}',
+                                'warning')
+
+        can_access_closed = info["can_access_closed"]
+
+        # todo if all(map(lambda x: x(), [func1, func2]))
+        friend_status = await self.check_friend_status(user_id, can_access_closed)
+        if not friend_status:
+            return False
+
+        validate = await self.check_user_validity(user_id, info, name)
+        if not validate:
+            return False
+
+        return validate
+
+    async def run(self, event: Event) -> None:
         text = event.text.lower()
         user_id = event.user_id
 
-        res_time_track = ResponseTimeTrack()
+        while user_id in self.verifying_users:  # Ожидаем завершения проверки
+            print('Ждем')
+            await asyncio.sleep(1)
 
-        if user_id in unusers:
-            auth_user = user_list[user_id]
+        res_time_track = ResponseTimeTrack(user_id)
+
+        if user_id in self.unverified_users:
+            auth_user = self.users_objects[user_id]
             table_user = await Users.get(user_id=auth_user.user_id)  # todo
             await asyncio.gather(
                 self.save_message(table_user, text, 'ЧС', 'ЧС'),  # todo
                 asyncio.to_thread(self.blacklist_message, auth_user, text)
             )
 
-        elif user_id in users:
-            auth_user = user_list[user_id]
-            table_user = await Users.get(user_id=auth_user.user_id)  # todo
-            if auth_user.state > self.state_answer_count:
-                unusers.append(auth_user.user_id)
-                await asyncio.gather(
-                    Users.block_user(auth_user.user_id),
-                    asyncio.to_thread(self.blacklist_message, auth_user, text)
-                )
+        elif user_id in self.verified_users:
+            await self.create_response(text, user_id)
+            res_time_track.stop()
 
-            elif auth_user.block_template < self.block_message_count:
-                await asyncio.gather(
-                    self.create_response(text, auth_user, table_user),
+        else:
+            # Если нету в базе
+            self.verifying_users.append(user_id)
+            # await asyncio.sleep(2)
+            verified = await self.verify_user(user_id, text)
+            if verified:
+                await self.create_answer(text, *verified)
+            self.verifying_users.remove(user_id)
 
-                    asyncio.to_thread(text_handler(signs['green'],
-                                                   f'Новое сообщение от {auth_user.name} / {user_id} - {text}',
-                                                   'info'))  # todo
-
-                )
-
-                res_time_track.stop()
-
-            else:
-                await asyncio.gather(
-                    asyncio.to_thread(text_handler, signs['yellow'],
-                                      f'Новое сообщение от {auth_user.name} /{user_id}/SPAM  - {text}',
-                                      'warning'),  # todo
-                    self.save_message(table_user, text, 'блок', 'блок')
-                )
-
-
-
-
-        else:  # Если нету в базе
-
-            info = await self.get_user_info(user_id)
-            # print(info)
-            name = info['first_name']
-
-            await asyncio.to_thread(text_handler, signs['yellow'],
-                                    f'Новое сообщение от {name} / {user_id} / Нету в базе - {text}',
-                                    'warning')
-            can_access_closed = info["can_access_closed"]
-
-            friend_status = await self.check_friend_status(user_id, can_access_closed)
-            if not friend_status:
-                return False
-
-            await self.check_user_validity(user_id, info, name, text)
-
-            res_time_track.stop(check=True)
+        res_time_track.stop(check=True)
 
     async def worker(self):
-        print('Обработчик сообщений запущен')
+        await asyncio.to_thread(
+            text_handler, signs['sun'], 'Обработчик сообщений запущен!', color='blue'
+        )
         while True:
             # Вытаскиваем 'рабочий элемент' из очереди.
             user_id, name, text = await self.message_queue.get()
-            # print(user_id, text)
-            # Задержка на 'sleep_for' секунд.
 
+            # Общее время между сообщениями включает и время печатания
             await asyncio.gather(
                 self.send_message(user_id, text),
                 asyncio.to_thread(
@@ -492,23 +351,29 @@ class VkUserControl:
                 ),
                 asyncio.to_thread(
                     text_handler, signs['queue'],
-                    f'Ожидание очереди. Тайминг {self.acc_delay} s',
+                    f'Ожидание очереди. Тайминг {self.delay_for_acc} s',
                     'info', 'cyan'
                 ),
-                asyncio.sleep(self.acc_delay)
+                asyncio.sleep(self.delay_for_acc)
             )
 
             self.message_queue.task_done()
-            user_list[user_id].block_template = 0  # снятие блока после обработки
+            self.users_objects[user_id].block_template = 0  # снятие блока после обработки
 
-            # print(self.message_queue)
-
-            # Сообщаем очереди, что 'рабочий элемент' обработан.
-            # queue.task_done()
+            # Проверка сигнала завершения
+            if self.message_queue.empty():
+                if self.signal_end:
+                    await asyncio.to_thread(text_handler, signs['yellow'], 'Завершение обработчика!')
+                    break
 
     async def run_session(self):
-        # await asyncio.sleep(1)
-        print(asyncio.get_event_loop())
+
+        # Инициализация базы данных
+        await init_tortoise()
+        # Выгрузка пользователей
+        await self.unloading_from_database()
+
+        print('Текущий цик событий', asyncio.get_event_loop())
         print('Текущий поток', multiprocessing.current_process(), threading.current_thread())  # todo
 
         try:
@@ -534,19 +399,17 @@ class VkUserControl:
                     # print(event_a)
                     if event_a[0] != 4:
                         continue
-                    # print(self.message_queue)
-                    event = self.parse_event(event_a)
 
+                    event = self.parse_event(event_a)
                     if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text and event.from_user:
                         self.loop.create_task(self.run(event))
-
-                    if self.signal_end:
-                        for task in self.message_threads:
-                            task.join()
-                        return
+                        if self.signal_end:
+                            # self.message_queue.empty()
+                            print('Закрытие цикла событий')
+                            asyncio.get_event_loop().close()
+                            # break
 
             except VkAuthError as e:
-                print(e)
                 exp_log.error(e)
                 await asyncio.gather(asyncio.to_thread(self.block_account_message),
                                      Account.blocking(self.info['id']), return_exceptions=True)
@@ -555,33 +418,16 @@ class VkUserControl:
             except Exception as e:
                 await asyncio.gather(
                     asyncio.to_thread(text_handler, signs['red'], 'ПЕРЕПОДКЛЮЧЕНИЕ...', 'error'),
-                    asyncio.to_thread(exp_log.exception, e)
+                    asyncio.to_thread(exp_log.warning, e)
                 )
-                print('ПЕРЕПОДКЛЮЧЕНИЕ...')  # todo
 
     async def all_validators(self, *args):
         tasks = [asyncio.to_thread(func, arg) for func, arg in zip(self.validators, args)]
         res = await asyncio.gather(*tasks, return_exceptions=True)
+        # print(res)
         if all(res):
             return True
         return False
-
-
-def is_bad_proxy(pip):
-    try:
-        proxy_handler = urllib.request.ProxyHandler({'http': pip})
-        opener = urllib.request.build_opener(proxy_handler)
-        opener.addheaders = [('User-agent', 'Mozilla/5.0')]
-        urllib.request.install_opener(opener)
-        req = urllib.request.Request('http://www.example.com')  # change the URL to test here
-        sock = urllib.request.urlopen(req)
-    except urllib.error.HTTPError as e:
-        # print('Error code: ', e.code)
-        return e.code
-    except Exception as detail:
-        # print("ERROR:", detail)
-        return True
-    return False
 
 
 # @log_handler
@@ -590,8 +436,6 @@ async def upload_all_data_main(statusbar=False):
     try:
 
         text_handler(f"VkBot v{bot_version}", '', color='blue')
-
-        await init_tortoise()
 
         text_handler(signs['magenta'], f'Загруженно токенов {len(tokens)}: ', color='magenta')
         for a, b in enumerate(tokens, 1):
@@ -603,7 +447,7 @@ async def upload_all_data_main(statusbar=False):
         text_handler(signs['magenta'], f"    Длительность отображения печати : {delay}", color='cyan')
 
         # Выгрузка стадий и юзеров
-        await upload_sql_users()
+        # await unloading_from_database()
 
         # todo
         text_handler(signs['magenta'], 'Проверка прокси:', color='magenta')

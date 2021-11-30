@@ -1,5 +1,6 @@
 import sys
 
+from core.handlers import validator_handler
 from core.handlers.log_handler import log_handler
 
 __all__ = [
@@ -34,7 +35,7 @@ def count_friends_validator(count: int) -> bool:
     return False
 
 
-def mens_validator(info: tuple) -> tuple[bool, int]:
+def mens_validator(info: tuple) -> bool:
     """
     Проверка соотношения м/ж
     if m<=35%:
@@ -47,12 +48,13 @@ def mens_validator(info: tuple) -> tuple[bool, int]:
     male, female, friends = info
     res = male / friends * 100
     if round(res) <= 35:
-        return False, res
+        return False
     else:
-        return True, res
+        return True
 
 
 current_module = sys.modules[__name__]
 for v_name in __all__:
-    v = getattr(current_module, v_name)
+    f = getattr(current_module, v_name)
+    v = validator_handler(f)
     setattr(current_module, v_name, log_handler(v))

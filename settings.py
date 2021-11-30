@@ -1,6 +1,8 @@
+import os
 from pathlib import Path
 
 import json
+import os
 
 # from polog import config, file_writer
 
@@ -35,7 +37,8 @@ views = read_json('config/validators_text.json')
 
 bot_version = settings['version']
 text_settings = settings['text_handler_controller']
-tokens = settings['tokens']
+
+tokens = [os.getenv('TOKENS')] or settings['tokens']
 
 signs = {
     "red": "✖",
@@ -46,7 +49,8 @@ signs = {
     "time": "⌛",
     "version": "∆",
     "queue": '•‣',
-    "message": '✉'
+    "message": '✉',
+    "sun": '☀'
 }
 
 log_colors = {

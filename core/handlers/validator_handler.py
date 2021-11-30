@@ -8,23 +8,21 @@ def validator_handler(func):
 
     def wrapper(*args, **kwargs):
         text_handler(signs['yellow'], validator['check'], 'warning')
-        try:
-            res = func(*args, **kwargs)
-        except Exception as e:
-            print(e)
-            res = False
-            exp_log.exception(e)
-
-        if func.__name__ == 'mens_validator':
-            if res[0]:
-                text_handler(signs['yellow'], validator['success'].format(res[1]))
-            else:
-                text_handler(signs['red'], validator['failure'], 'error').format(res[1])
+        res = func(*args, **kwargs)
+        if res:
+            text_handler(signs['yellow'], validator['success'])
         else:
-            if res:
-                text_handler(signs['yellow'], validator['success'])
-            else:
-                text_handler(signs['red'], validator['failure'], 'error')
-            return res
+            text_handler(signs['red'], validator['failure'], 'error')
+        # if func.__name__ == 'mens_validator':
+        #     if res[0]:
+        #         text_handler(signs['yellow'], validator['success'].format(res[1]))
+        #     else:
+        #         text_handler(signs['red'], validator['failure'], 'error').format(res[1])
+        # else:
+        #     if res:
+        #         text_handler(signs['yellow'], validator['success'])
+        #     else:
+        #         text_handler(signs['red'], validator['failure'], 'error')
+        return res
 
     return wrapper

@@ -1,5 +1,5 @@
 {
-  "version": "0.8.2.2",
+  "version": "2.3.2.1",
   "text_handler_controller": {
     "accept_handling": true,
 
@@ -18,6 +18,9 @@
     "YBJ4Eq:u5HmBf@217.29.62.158:14866",
     "YBJ4Eq:u5HmBf@217.29.62.158:14866"
   ],
+
+  "block_message_count" : 2,
+
   "delay_response_from": 2,
   "delay_response_to": 2,
 

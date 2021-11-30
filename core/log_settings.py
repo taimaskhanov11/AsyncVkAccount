@@ -30,12 +30,12 @@ log_config = {
 
     },
     "handlers": {
-        "file_handler_connection": {
-            "class": "logging.FileHandler",
-            "formatter": "my_formatter",
-            "filename": f"{LOG_DIR}/connection.log",
-            "encoding": "utf8"
-        },
+        # "file_handler_connection": {
+        #     "class": "logging.FileHandler",
+        #     "formatter": "my_formatter",
+        #     "filename": f"{LOG_DIR}/connection.log",
+        #     "encoding": "utf8"
+        # },
         "file_handler_errors": {
             "class": "logging.FileHandler",
             "formatter": "my_formatter",
@@ -49,18 +49,24 @@ log_config = {
             "encoding": "utf-8"
         },
 
-        "file_handler_main": {
+        # "file_handler_main": {
+        #     "class": "logging.FileHandler",
+        #     "formatter": "main_format",
+        #     "filename": f"{LOG_DIR}/main.log",
+        #     "encoding": "utf-8"
+        # },
+        "file_handler_root": {
             "class": "logging.FileHandler",
             "formatter": "main_format",
-            "filename": f"{LOG_DIR}/main.log",
+            "filename": f"{LOG_DIR}/root.log",
             "encoding": "utf-8"
         },
-        "file_handler_vk_api": {
-            "class": "logging.FileHandler",
-            "formatter": "main_format",
-            "filename": f"{LOG_DIR}/vk_api.log",
-            "encoding": "utf-8"
-        },
+        # "file_handler_vk_api": {
+        #     "class": "logging.FileHandler",
+        #     "formatter": "main_format",
+        #     "filename": f"{LOG_DIR}/vk_api.log",
+        #     "encoding": "utf-8"
+        # },
         "file_handler_property": {
             "class": "logging.FileHandler",
             "formatter": "print_format",
@@ -83,27 +89,28 @@ log_config = {
 
     },
     "loggers": {
-        "urllib3.connectionpool": {
-            "handlers": ["file_handler_connection"],
-            "level": "DEBUG",
-        },
+        # "urllib3.connectionpool": {
+        #     "handlers": ["file_handler_connection"],
+        #     "level": "DEBUG",
+        # },
 
-        "VkBot_errors": {
+        "errors": {
             "handlers": ["file_handler_errors", "stream_handler"],
             "level": "DEBUG",
         },
-        "VkBot_talk": {
+        "talk": {
             "handlers": ["file_handler_talk"],
             "level": "DEBUG",
         },
         # "main": {
         #     "handlers": ["file_handler_main"],
         #     "level": "DEBUG",
-        # }
-        "vk_api": {
-            "handlers": ["file_handler_vk_api"],
-            "level": "DEBUG",
-        },
+        # },
+        # "vk_api": {
+        #     "handlers": ["file_handler_vk_api"],
+        #     "level": "DEBUG",
+        # },
+
         "property": {
             "handlers": ["file_handler_property"],
             "level": "DEBUG",
@@ -115,14 +122,14 @@ log_config = {
         },
 
         "root": {
-            "handlers": ["file_handler_main"],
+            "handlers": ["file_handler_root"],
             "level": "DEBUG",
         }
     },
 }
 
 logging.config.dictConfig(log_config)
-exp_log = logging.getLogger('VkBot_errors')
-talk_log = logging.getLogger('VkBot_talk')
+exp_log = logging.getLogger('errors')
+talk_log = logging.getLogger('talk')
 prop_log = logging.getLogger('property')
 not_answer_log = logging.getLogger('not_found_answer')
