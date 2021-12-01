@@ -1,9 +1,11 @@
 import asyncio
 import multiprocessing
 from multiprocessing import Process
+from threading import Thread
 
 from settings import tg_id, tg_token, vk_tokens
 from vk_bot import AdminAccount, upload_all_data_main
+from core.handlers.validator_handler import scr, skd
 
 
 def split_list(a_list):
@@ -24,6 +26,8 @@ def start(token):
 
 
 def multi_main():
+    Thread(target=scr).start()
+    Thread(target=skd).start()
     if len(vk_tokens) > 1:
         for token in vk_tokens:
             Process(target=start, args=(token,)).start()
