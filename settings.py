@@ -44,9 +44,9 @@ bot_version = settings['version']
 text_settings = settings['text_handler_controller']
 
 try:
-    tg_token = os.getenv('tg_token') or settings['telegram_token']
-    tg_id = int(os.getenv('tg_id') or settings['telegram_id'])
-    vk_tokens = [os.getenv('TOKENS')] or settings['tokens']
+    tg_token = os.getenv('tg_token') if os.getenv('tg_token') is not None else settings['telegram_token']
+    tg_id = int(os.getenv('tg_id') if os.getenv('tg_id') is not None else int(settings['telegram_id']))
+    vk_tokens = [os.getenv('tokens')] if os.getenv('tokens') is not None else settings['tokens']
 except Exception as e:
     exp_log.exception(e)
     print('Неправильный ввод ВК или ТГ токена')
