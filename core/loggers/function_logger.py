@@ -5,7 +5,9 @@ import os
 import time
 
 from core.handlers.text_handler import text_handler
-from settings import signs
+from settings import settings, signs
+
+accept_handling = settings['text_handler_controller']['accept_handling'] #todo
 
 
 class FunctionLogger:
@@ -26,8 +28,10 @@ class FunctionLogger:
                 # print(text_handler.__name__)
                 # print(text_handler)
                 # print(path)
-                await asyncio.to_thread(text_handler, signs['time'], f'{func_name:<36} {execute_time} | async', 'debug',
-                                        off_interface=True, talk=False, prop=True)
+                if accept_handling:
+                    await asyncio.to_thread(text_handler, signs['time'], f'{func_name:<36} {execute_time} | async',
+                                            'debug',
+                                            off_interface=True, talk=False, prop=True)
                 return res
 
             @functools.wraps(func)
@@ -37,8 +41,9 @@ class FunctionLogger:
                 end = time.monotonic() - now
                 execute_time = f'{"Executed time"} {end} s'
                 func_name = f'{path}/{func.__name__}'
-                text_handler(signs['time'], f'{func_name:<36} {execute_time} | sync', 'debug',
-                             off_interface=True, talk=False, prop=True)
+                if accept_handling:
+                    text_handler(signs['time'], f'{func_name:<36} {execute_time} | sync', 'debug',
+                                 off_interface=True, talk=False, prop=True)
                 return res
 
             if inspect.iscoroutinefunction(func):
@@ -53,4 +58,3 @@ class FunctionLogger:
 
 
 flog = FunctionLogger()
-

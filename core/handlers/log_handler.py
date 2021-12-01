@@ -1,8 +1,8 @@
 import inspect
 import sys
 
+from core.loggers.class_logger import clog, flog
 from settings import settings
-from core.loggers.class_logger import clog,flog
 
 accept_handling = settings['text_handler_controller']['accept_handling']
 

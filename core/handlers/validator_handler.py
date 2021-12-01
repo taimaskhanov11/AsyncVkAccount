@@ -1,12 +1,66 @@
-from .text_handler import text_handler
-from core.log_settings import exp_log
+import functools
+import inspect
+
 from settings import signs, views
 
+from .log_handler import log_handler
+from .text_handler import text_handler
 
-def validator_handler(func):
+
+class ValidatorHandler:
+
+    def __call__(self, *args, **kwargs):
+        # print(args)
+
+        def decorator(Class):
+
+            def func_decor(func):
+                validator = views['validators'][func.__name__]
+
+                @functools.wraps(func)
+                def wrapper(*args, **kwargs):
+                    text_handler(signs['yellow'], validator['check'], 'warning')
+                    res = func(*args, **kwargs)
+                    if res:
+                        text_handler(signs['yellow'], validator['success'])
+                    else:
+                        text_handler(signs['red'], validator['failure'], 'error')
+                    return res
+
+                return wrapper
+
+            # Получаем имена методов класса.
+            all_methods = [func for func in dir(Class) if
+                           callable(getattr(Class, func)) and (not func.startswith('__') and not func.endswith('__'))]
+
+            for method_name in all_methods:
+                method = getattr(Class, method_name)
+                # print(method)
+                if inspect.isfunction(method):
+                    # print(method_name)
+                    if method_name in ['photo_validator', 'age_validator',
+                                       'mens_validator', 'count_friends_validator']:
+                        new_method = log_handler(func_decor(method))  # todo
+                    else:
+                        new_method = log_handler(method)
+                    setattr(Class, method_name, new_method)
+            return Class
+
+        if not len(args):
+            return decorator
+        elif len(args) == 1 and callable(args[0]):
+            return decorator(args[0])
+        raise ValueError('You used the logging decorator incorrectly. Read the documentation.')
+
+
+validator_handler = ValidatorHandler()
+
+
+def validator_handlerOLD(func):
     validator = views['validators'][func.__name__]
 
     def wrapper(*args, **kwargs):
+
         text_handler(signs['yellow'], validator['check'], 'warning')
         res = func(*args, **kwargs)
         if res:

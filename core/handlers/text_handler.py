@@ -6,7 +6,14 @@ from settings import log_colors, settings, text_settings
 accept_handling = settings['text_handler_controller']['accept_handling']
 
 
-def text_handler(sign, text, log_type='info', color=None, full=False, off_interface=False, talk=True, prop=False):
+def text_handler(sign: str,
+                 text: str,
+                 log_type: str = 'info',
+                 color: str = None,
+                 full=False, #todo
+                 off_interface=False,
+                 talk: bool = True,
+                 prop: bool = False) -> None:
     if not accept_handling:
         return
 
