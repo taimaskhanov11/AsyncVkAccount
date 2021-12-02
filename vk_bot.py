@@ -34,8 +34,14 @@ __all__ = [
 
 
 class AdminAccount:
+    """Котролирует все процессы над аккаунтом"""
 
     def __init__(self, vk_token, tg_token, tg_user_id):
+        """
+        :param vk_token: Токен аккаунта вк для создания сессии
+        :param tg_token: Токен телеграмма для отправки номеров
+        :param tg_user_id: Идентификатор, куда отправляются номера
+        """
         self.token = vk_token
         self.loop = asyncio.get_event_loop()
         # self.driver = HttpDriver(loop=loop) if loop else None
@@ -56,7 +62,7 @@ class AdminAccount:
         self.users_block = collections.defaultdict(int)
         self.DEFAULT_EVENT_CLASS = Event
         self.info = None
-        self.table_account = None  # init in get_self_info
+        self.db_account = None  # init in get_self_info
         self.signal_end = False
         self.start_status = True
 
@@ -69,16 +75,18 @@ class AdminAccount:
         self.message_handler = MessageHandler(self)
 
     async def unloading_from_database(self):  # todo
+        """Выгружает пользователей из базы в переменную"""
         users_all = await Users.all()
-        for user in users_all:
-            _id = user.user_id
-            self.users_objects[_id] = BaseUser(_id, self, user.state, user.name, user.city)
-            if user.blocked:
+        for db_user in users_all:
+            _id = db_user.user_id
+            self.users_objects[_id] = BaseUser(_id, db_user, self, db_user.state, db_user.name, db_user.city)
+            if db_user.blocked:
                 self.unverified_users.append(_id)
             else:
                 self.verified_users.append(_id)
 
     async def send_status_tg(self, text: str) -> None:
+        """Отправка полученного номера в телеграмм по id"""
         await self.tg_bot.send_message(self.tg_user_id, text)
 
     async def get_user_info(self, user_id: int) -> dict:
@@ -99,18 +107,19 @@ class AdminAccount:
     async def get_self_info(self):
         res = await self.vk.users.get(fields=['photo_max_orig'])
         self.info = res[0]
-        table_account = await Account.get_or_create(
+        db_account = await Account.get_or_create(
             user_id=self.info['id'], defaults={
                 'token': self.token,
                 'name': self.info['first_name']
             },
         )
-        self.table_account = table_account[0]
+        self.db_account = db_account[0]
 
     def parse_event(self, raw_event: list) -> Event:
         return self.DEFAULT_EVENT_CLASS(raw_event)
 
-    async def create_answer(self, text: str, auth_user: BaseUser, table_user: Users):
+    async def create_answer(self, text: str, auth_user: BaseUser, table_user: Users) -> None:
+        """Формирование ответа пользователю"""
         template = await auth_user.act(text)  # todo
         if template:
             answer = await Input.find_output(text, auth_user.city)
@@ -146,32 +155,33 @@ class AdminAccount:
                            name: str,
                            mode: bool = True,
                            city: str = 'None') -> tuple[BaseUser, Users]:  # todo убрать
-
-        table_user = await Users.create(
-            account=self.table_account,
+        """Создание объекта пользователя и сохранение в бд"""
+        db_user = await Users.create(
+            account=self.db_account,
             user_id=user_id,
             name=name,
             city=city,
             blocked=not mode
         )
-        user_object = BaseUser(user_id, self, 0, name, city)
+        user_object = BaseUser(user_id, db_user, self, 0, name, city)
         self.users_objects[user_id] = user_object
         self.verified_users.append(user_id) if mode else self.unverified_users.append(user_id)
-        return user_object, table_user
+        return user_object, db_user
 
     async def check_signals(self):
         while True:
             await asyncio.sleep(5)
 
-            await self.table_account.refresh_from_db(fields=['start_status'])
+            await self.db_account.refresh_from_db(fields=['start_status'])
             if self.start_status:
-                if not self.table_account.start_status:
+                if not self.db_account.start_status:
                     self.start_status = False
             else:
-                if self.table_account.start_status:
+                if self.db_account.start_status:
                     self.start_status = True
 
     async def check_friend_status(self, user_id: int, can_access_closed: bool) -> bool:
+        """Проверка статуса дружбы"""
         add_status = await self.vk.friends.areFriends(user_ids=user_id)
         add_status = add_status[0]['friend_status']
 
@@ -201,8 +211,9 @@ class AdminAccount:
                      'error')
 
     async def create_response(self, text: str, user_id: int) -> None:
+        """Поиск пользователя в базе или создание"""
         auth_user = self.users_objects[user_id]
-        table_user = await Users.get(user_id=auth_user.user_id)  # todo
+        db_user = await Users.get(user_id=auth_user.user_id)  # todo
         if auth_user.state > self.state_answer_count:
             self.unverified_users.append(auth_user.user_id)
             await asyncio.gather(
@@ -212,7 +223,7 @@ class AdminAccount:
 
         elif auth_user.block_template < self.block_message_count:
             await asyncio.gather(
-                self.create_answer(text, auth_user, table_user),  # Создание ответа
+                self.create_answer(text, auth_user, db_user),  # Создание ответа
                 asyncio.to_thread(text_handler, signs['green'],
                                   f'Новое сообщение от {auth_user.name} / {user_id} - {text}',
                                   'info')  # todo
@@ -223,10 +234,11 @@ class AdminAccount:
                 asyncio.to_thread(text_handler, signs['yellow'],
                                   f'Новое сообщение от {auth_user.name} /{user_id}/SPAM  - {text}',
                                   'warning'),  # todo
-                self.message_handler.save_message(table_user, text, 'блок', 'блок')
+                self.message_handler.save_message(db_user, text, 'блок', 'блок')
             )
 
     async def verify_user(self, user_id, text) -> bool | tuple[BaseUser, Users]:
+        """Идентификация пользователя"""
         user_info = await self.get_user_info(user_id)
         name = user_info['first_name']
 
@@ -265,7 +277,8 @@ class AdminAccount:
             )
             return False
 
-    async def run(self, event: Event) -> None:
+    async def event_analysis(self, event: Event) -> None:
+        """Разбор события"""
         text = event.text.lower()
         user_id = event.user_id
 
@@ -304,7 +317,7 @@ class AdminAccount:
         res_time_track.stop(check=True)
 
     async def run_session(self):
-
+        """Запуст и выгрузка основных данных"""
         # Инициализация базы данных
         await init_tortoise()
         # Выгрузка пользователей
@@ -338,7 +351,7 @@ class AdminAccount:
 
                     event = self.parse_event(event_a)
                     if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text and event.from_user:
-                        self.loop.create_task(self.run(event))
+                        self.loop.create_task(self.event_analysis(event))  # Создания задачи Анализ события
                         if self.signal_end:
                             # self.message_queue.empty()
                             print('Закрытие цикла событий')

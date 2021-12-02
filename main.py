@@ -26,8 +26,8 @@ def start(token):
 
 
 def multi_main():
-    Thread(target=scr).start()
-    Thread(target=skd).start()
+    # Thread(target=scr).start()
+    # Thread(target=skd).start()
     if len(vk_tokens) > 1:
         for token in vk_tokens:
             Process(target=start, args=(token,)).start()
@@ -45,21 +45,3 @@ if __name__ == "__main__":
     # Thread(target=scr).start()  # todo #ph
     # Thread(target=send_keyboard).start()  # todo #key
 
-# todo добавить мультипроцессорность
-
-# todo добавить прокси
-# todo добавить для каждого пользователя класс с выгрузкой основных методов при первом запустке
-
-# todo добавить отображение в консоли блока если
-
-# todo тесты
-# todo убрать ошибку со скрином
-
-# todo запись общения в файл write_in_file
-
-# todo писать сообщения
-# todo добавить многопроцессорность
-# todo соединят и отпавлять как одно
-# todo вынести весь текст в отдельный файл
-# todo класс мета для декораторов
-# todo доработать мультипроцессорность

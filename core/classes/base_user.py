@@ -11,8 +11,9 @@ from settings import conversation_stages, signs
 
 
 class BaseUser:
-    def __init__(self, user_id, overlord, state, name, city):
+    def __init__(self, user_id: int, db_user: Users, overlord, state: int, name: str, city: str):
         self.overlord = overlord
+        self.db_user = db_user
         self.user_id = user_id
         self.state = state
         self.name = name
@@ -23,33 +24,14 @@ class BaseUser:
         self.block_template = 0
         self.last_answer_time = 0
 
-    def append_to_exel(self, user_id, text, name):  # todo убрать
-        time = datetime.datetime.now().replace(microsecond=0)
-        excel_data_df = pd.read_excel("username.xlsx")
-        data = pd.DataFrame(
-            {
-                "UserID": [user_id],
-                "Name": [name],
-                "Url": [f"https://vk.com/id{user_id}"],
-                "Number": [text],
-                "Date": [time],
-            }
-        )
-        res = excel_data_df.append(data)
-        res.to_excel("username.xlsx", index=False)
-        # print(res)
-        return data
-
     async def add_state(self):
         self.state += 1
         await Users.add_state(self.user_id)
 
     async def number_success(self, text):
         await asyncio.gather(
-            # todo добавлять в таблицу
-            # Numbers.create(user_id=self.user_id, name=self.name, city=self.city, number=text),
+            Numbers.create(user=self.db_user, number=text),
             Users.change_value(self.user_id, "blocked", True),
-            # asyncio.to_thread(self.append_to_exel, self.user_id, text, self.name),
             asyncio.to_thread(
                 text_handler,
                 signs["mark"],
@@ -76,7 +58,7 @@ class BaseUser:
     async def act(self, text: str):
         await self.add_state()
         if self.state >= self.half_template:
-            result = re.findall("\d{4,}", text)
+            result = re.findall(r"\d{4,}", text)
             if result:
                 await self.number_success(text)
                 return False

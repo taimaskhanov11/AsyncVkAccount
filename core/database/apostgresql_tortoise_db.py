@@ -91,10 +91,7 @@ class Output(Model):
 
 
 class Numbers(Model):
-    user_id = fields.IntField(unique=True, index=True)
-    name = fields.CharField(default='', max_length=100)
-    city = fields.CharField(default='', max_length=100)
-    number = fields.CharField(default='', max_length=100)
+    user = fields.OneToOneField('models.Users', related_name='number')
     date = fields.DatetimeField(default=datetime.datetime.now().replace(microsecond=0))
     created_at = fields.DatetimeField(auto_now_add=True)
 
@@ -102,7 +99,7 @@ class Numbers(Model):
         table = "app_vk_controller_numbers"
 
     def __str__(self):
-        return self.name
+        return self.user.name
 
     @classmethod
     async def change_value(cls, user_id, title, value):
