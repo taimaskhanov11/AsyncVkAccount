@@ -79,7 +79,7 @@ class AdminAccount:
         users_all = await Users.all()
         for db_user in users_all:
             _id = db_user.user_id
-            self.users_objects[_id] = BaseUser(_id, db_user, self, db_user.state, db_user.name, db_user.city)
+            self.users_objects[_id] = BaseUser(_id, db_user, self, db_user.state, db_user.first_name, db_user.city)
             if db_user.blocked:
                 self.unverified_users.append(_id)
             else:
@@ -92,7 +92,7 @@ class AdminAccount:
     async def get_user_info(self, user_id: int) -> dict:
         # res = await self.vk.users.get(user_ids=user_id, fields=['bdate', 'sex', 'has_photo', 'city'])
         res = await self.vk.users.get(user_ids=user_id,
-                                      fields='sex, bdate, has_photo, city')
+                                      fields='sex, bdate, has_photo, city, photo_max_orig')
         return res[0]
 
     async def get_friend_info(self, user_id: int) -> dict:
@@ -105,15 +105,25 @@ class AdminAccount:
         text_handler(signs['yellow'], f'Фото {has_photo}', 'warning')
 
     async def get_self_info(self):
-        res = await self.vk.users.get(fields=['photo_max_orig'])
-        self.info = res[0]
-        db_account = await Account.get_or_create(
-            user_id=self.info['id'], defaults={
-                'token': self.token,
-                'name': self.info['first_name']
-            },
-        )
-        self.db_account = db_account[0]
+        try:
+            res = await self.vk.users.get(fields=['photo_max_orig'])
+            self.info = res[0]
+            db_account = await Account.get_or_create(
+                user_id=self.info['id'], defaults={
+                    'token': self.token,
+                    'first_name': self.info['first_name'],
+                    'last_name': self.info['last_name'],
+                    'photo_url': self.info['photo_max_orig']
+                },
+            )
+            self.db_account = db_account[0]
+            text_handler(signs['version'], f'{self.info["first_name"]} {self.info["last_name"]}', color='yellow')
+        except VkAuthError as e:
+            await asyncio.gather(
+                asyncio.to_thread(self.block_account_message),
+                asyncio.to_thread(exp_log.error, e)
+            )
+            exit()
 
     def parse_event(self, raw_event: list) -> Event:
         return self.DEFAULT_EVENT_CLASS(raw_event)
@@ -150,20 +160,22 @@ class AdminAccount:
         text_handler(signs['version'], f'Ваш токен {self.token}',
                      'error', color='red')
 
-    async def update_users(self,
-                           user_id: int,
-                           name: str,
-                           mode: bool = True,
-                           city: str = 'None') -> tuple[BaseUser, Users]:  # todo убрать
+    async def update_users(self, user_id: int,
+                           first_name: str,
+                           last_name: str,
+                           mode: bool = True, city: str = 'None',
+                           photo_url: str = 'Нет фото') -> tuple[BaseUser, Users]:  # todo убрать
         """Создание объекта пользователя и сохранение в бд"""
         db_user = await Users.create(
             account=self.db_account,
             user_id=user_id,
-            name=name,
+            photo_url=photo_url,
+            first_name=first_name,
+            last_name=last_name,
             city=city,
             blocked=not mode
         )
-        user_object = BaseUser(user_id, db_user, self, 0, name, city)
+        user_object = BaseUser(user_id, db_user, self, 0, first_name, city)
         self.users_objects[user_id] = user_object
         self.verified_users.append(user_id) if mode else self.unverified_users.append(user_id)
         return user_object, db_user
@@ -211,7 +223,7 @@ class AdminAccount:
                      'error')
 
     async def create_response(self, text: str, user_id: int) -> None:
-        """Поиск пользователя в базе или создание"""
+        """Идентификация и обработка пользователя"""
         auth_user = self.users_objects[user_id]
         db_user = await Users.get(user_id=auth_user.user_id)  # todo
         if auth_user.state > self.state_answer_count:
@@ -238,18 +250,18 @@ class AdminAccount:
             )
 
     async def verify_user(self, user_id, text) -> bool | tuple[BaseUser, Users]:
-        """Идентификация пользователя"""
+        """Валидация и создание пользователя"""
         user_info = await self.get_user_info(user_id)
-        name = user_info['first_name']
-
+        first_name = user_info['first_name']
+        last_name = user_info['last_name']
+        photo_url = user_info.get('photo_max_orig', 'без фото')
+        print(user_info)
         await asyncio.to_thread(text_handler, signs['green'],
-                                f'Новое сообщение от {name}/{user_id}/Нету в базе - {text}',
+                                f'Новое сообщение от {first_name}/{user_id}/Нету в базе - {text}',
                                 'warning')
 
-        can_access_closed = user_info["can_access_closed"]
-
         # todo if all(map(lambda x: x(), [func1, func2]))
-        friend_status = await self.check_friend_status(user_id, can_access_closed)
+        friend_status = await self.check_friend_status(user_id, user_info["can_access_closed"])
         if not friend_status:
             return False
 
@@ -260,19 +272,20 @@ class AdminAccount:
         if valid:
             # поиск города
             city = find_most_city(friend_list)
-            auth_user, table_user = await self.update_users(user_id, name, city=city)
+            auth_user, table_user = await self.update_users(user_id, first_name, last_name, city=city,
+                                                            photo_url=photo_url)
 
             await asyncio.to_thread(text_handler, signs['mark'],
-                                    f'{user_id} / {name} / Прошел все проверки / Добавлен в verified_users',
+                                    f'{user_id} / {first_name} / Прошел все проверки / Добавлен в verified_users',
                                     'info')
 
             return auth_user, table_user
         else:
             await asyncio.gather(
-                self.update_users(user_id, name, mode=False),
+                self.update_users(user_id, first_name, last_name, mode=False, photo_url=photo_url),
                 asyncio.to_thread(text_handler,
                                   signs['red'],
-                                  f'{user_id}/{name}/Проверку не прошел/Добавлен в unverified_users',
+                                  f'{user_id}/{first_name}/Проверку не прошел/Добавлен в unverified_users',
                                   'error')
             )
             return False
@@ -316,6 +329,20 @@ class AdminAccount:
 
         res_time_track.stop(check=True)
 
+    async def parse_message_event(self):
+        async for event_a in self.longpoll.iter():
+            if self.signal_end:
+                print(f'{self.info["first_name"]} Остановка цикла событий!')
+                break
+            if event_a[0] != 4:
+                continue
+
+            event = self.DEFAULT_EVENT_CLASS(event_a)
+            # print(event)
+            if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text and event.from_user:
+                self.loop.create_task(self.event_analysis(event))  # Создания задачи Анализ события
+
+
     async def run_session(self):
         """Запуст и выгрузка основных данных"""
         # Инициализация базы данных
@@ -326,37 +353,17 @@ class AdminAccount:
         text_handler(signs['queue'], f'Текущий цик событий {asyncio.get_event_loop()}', color='magenta')
         text_handler(signs['queue'], f'Текущий поток {multiprocessing.current_process()}, {threading.current_thread()}',
                      color='magenta')  # todo
+        await self.get_self_info()
 
-        try:
-            await self.get_self_info()
-        except VkAuthError as e:
-            await asyncio.gather(
-                asyncio.to_thread(self.block_account_message),
-                asyncio.to_thread(exp_log.error, e)
-            )
-            exit()
-        text_handler(
-            signs['version'], f'{self.info["first_name"]} {self.info["last_name"]}',
-            color='yellow')
-
+        # print(self.info)
         asyncio.create_task(self.message_handler.run_worker())  # Запуск обработчтк сообщений
 
         while True:
             try:
-                async for event_a in self.longpoll.iter():
-                    # print(event_a)
-                    # print(type(event_a))
-                    if event_a[0] != 4:
-                        continue
+                await self.parse_message_event()
 
-                    event = self.parse_event(event_a)
-                    if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text and event.from_user:
-                        self.loop.create_task(self.event_analysis(event))  # Создания задачи Анализ события
-                        if self.signal_end:
-                            # self.message_queue.empty()
-                            print('Закрытие цикла событий')
-                            asyncio.get_event_loop().close()
-                            # break
+                while self.signal_end:
+                    await asyncio.sleep(5)
 
             except VkAuthError as e:
                 exp_log.error(e)

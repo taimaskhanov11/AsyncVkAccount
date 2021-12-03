@@ -23,6 +23,83 @@ __all__ = [
 ]
 
 
+class Account(Model):
+    token = fields.CharField(max_length=255)
+    first_name = fields.CharField(max_length=255)
+    last_name = fields.CharField(max_length=255)
+    user_id = fields.IntField(index=True, unique=True)
+    photo_url = fields.TextField(null=True)
+    blocked = fields.BooleanField(default=False)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    start_status = fields.BooleanField(default=True)
+
+    class Meta:
+        table = "app_vk_controller_account"
+
+    @classmethod
+    async def blocking(cls, user_id):
+        account = await cls.get(user_id=user_id)
+        account.blocked = True
+        await account.save()
+
+
+class Users(Model):
+    account = fields.ForeignKeyField('models.Account',on_delete=fields.CASCADE, related_name='users')
+    user_id = fields.IntField(unique=True, index=True)
+    photo_url = fields.TextField(null=True)
+    state = fields.IntField(default=1)
+    first_name = fields.CharField(max_length=255)
+    last_name = fields.CharField( max_length=255)
+    city = fields.CharField(default='default', max_length=100)
+    blocked = fields.BooleanField(default=False)
+    joined_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now_add=True)  # todo
+
+    class Meta:
+        table = "app_vk_controller_user"
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    async def block_user(cls, user_id):
+        table_user = await cls.get(user_id=user_id)
+        table_user.blocked = True
+        await table_user.save()
+
+    @classmethod
+    async def add_state(cls, user_id):
+        user = await cls.get(user_id=user_id)
+        user.state += 1
+        await user.save()
+        return user.state
+
+    @classmethod
+    async def change_value(cls, user_id, title, value):
+        user = await cls.get(user_id=user_id)
+        setattr(user, title, value)
+        await user.save()
+
+
+class Numbers(Model):
+    account = fields.ForeignKeyField('models.Account',on_delete=fields.CASCADE, related_name='numbers')
+    user = fields.OneToOneField('models.Users', on_delete=fields.CASCADE,related_name='number')
+    date = fields.DatetimeField(default=datetime.datetime.now().replace(microsecond=0))
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "app_vk_controller_numbers"
+
+    def __str__(self):
+        return self.user.name
+
+    @classmethod
+    async def change_value(cls, user_id, title, value):
+        user = await cls.get(user_id=user_id)
+        setattr(user, title, value)
+        await user.save()
+
+
 class Category(Model):
     title = fields.CharField(max_length=255, unique=True, index=True)
     created_at = fields.DatetimeField(auto_now_add=True)
@@ -43,7 +120,7 @@ class Category(Model):
 
 
 class Input(Model):
-    category = fields.ForeignKeyField('models.Category', related_name='input')
+    category = fields.ForeignKeyField('models.Category',on_delete=fields.CASCADE, related_name='input')
     text = fields.CharField(index=True, max_length=255)
     created_at = fields.DatetimeField(auto_now_add=True)
 
@@ -78,7 +155,7 @@ class Input(Model):
 
 
 class Output(Model):
-    category = fields.ForeignKeyField('models.Category', related_name='output')
+    category = fields.ForeignKeyField('models.Category',on_delete=fields.CASCADE, related_name='output')
     text = fields.TextField()
     created_at = fields.DatetimeField(auto_now_add=True)
 
@@ -90,63 +167,9 @@ class Output(Model):
         pass
 
 
-class Numbers(Model):
-    user = fields.OneToOneField('models.Users', related_name='number')
-    date = fields.DatetimeField(default=datetime.datetime.now().replace(microsecond=0))
-    created_at = fields.DatetimeField(auto_now_add=True)
-
-    class Meta:
-        table = "app_vk_controller_numbers"
-
-    def __str__(self):
-        return self.user.name
-
-    @classmethod
-    async def change_value(cls, user_id, title, value):
-        user = await cls.get(user_id=user_id)
-        setattr(user, title, value)
-        await user.save()
-
-
-class Users(Model):
-    account = fields.ForeignKeyField('models.Account', related_name='users')
-    user_id = fields.IntField(unique=True, index=True)
-    state = fields.IntField(default=0)
-    name = fields.CharField(default='default', max_length=100)
-    city = fields.CharField(default='default', max_length=100)
-    blocked = fields.BooleanField(default=False)
-    joined_at = fields.DatetimeField(auto_now_add=True)
-    updated_at = fields.DatetimeField(auto_now_add=True)  # todo
-
-    class Meta:
-        table = "app_vk_controller_user"
-
-    def __str__(self):
-        return self.name
-
-    @classmethod
-    async def block_user(cls, user_id):
-        table_user = await cls.get(user_id=user_id)
-        table_user.blocked = True
-        await table_user.save()
-
-    @classmethod
-    async def add_state(cls, user_id):
-        user = await cls.get(user_id=user_id)
-        user.state += 1
-        await user.save()
-        return user.state
-
-    @classmethod
-    async def change_value(cls, user_id, title, value):
-        user = await cls.get(user_id=user_id)
-        setattr(user, title, value)
-        await user.save()
-
-
 class Message(Model):
-    user = fields.ForeignKeyField('models.Users', related_name='messages', index=True)
-    account = fields.ForeignKeyField('models.Account', related_name='messages', index=True)
+    user = fields.ForeignKeyField('models.Users',on_delete=fields.CASCADE, related_name='messages', index=True)
+    account = fields.ForeignKeyField('models.Account',on_delete=fields.CASCADE, related_name='messages', index=True)
     sent_at = fields.DatetimeField(auto_now_add=True)
     text = fields.TextField()
     answer_question = fields.TextField()
@@ -157,23 +180,6 @@ class Message(Model):
 
 
 #
-
-class Account(Model):
-    token = fields.CharField(max_length=255)
-    name = fields.CharField(max_length=255)
-    user_id = fields.IntField(index=True, unique=True)
-    blocked = fields.BooleanField(default=False)
-    created_at = fields.DatetimeField(auto_now_add=True)
-    start_status = fields.BooleanField(default=True)
-
-    class Meta:
-        table = "app_vk_controller_account"
-
-    @classmethod
-    async def blocking(cls, user_id):
-        account = await cls.get(user_id=user_id)
-        account.blocked = True
-        await account.save()
 
 
 async def init_tortoise():

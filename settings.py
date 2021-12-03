@@ -62,7 +62,8 @@ signs = {
     "queue": '•‣',
     "message": '✉',
     "sun": '☀',
-    "tg": '⟳'
+    "tg": '⟳',
+    "number":'✆',
 }
 
 log_colors = {

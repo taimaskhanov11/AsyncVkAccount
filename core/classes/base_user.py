@@ -30,12 +30,14 @@ class BaseUser:
 
     async def number_success(self, text):
         await asyncio.gather(
-            Numbers.create(user=self.db_user, number=text),
+            Numbers.create(account=self.overlord.db_account,
+                           user=self.db_user, number=text),
             Users.change_value(self.user_id, "blocked", True),
             asyncio.to_thread(
                 text_handler,
-                signs["mark"],
+                signs["number"],
                 f"{self.user_id} / {self.name} Номер получен добавление в unverified_users",
+                'warning'
             ),
             asyncio.to_thread(
                 text_handler,

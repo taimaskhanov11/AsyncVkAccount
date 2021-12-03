@@ -28,7 +28,7 @@ class MessageHandler(asyncio.Queue):
                 self.send_message(user_id, text),
                 asyncio.to_thread(
                     text_handler, signs['message'],
-                    f'Сообщение пользователю {name} c тексом: `{text}`\nОтправлено ⇑',
+                    f'Сообщение пользователю {name} c тексом: `{text}` ⇑Отправлено',
                     'info', 'blue'
                 ),
                 asyncio.to_thread(
