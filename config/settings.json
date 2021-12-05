@@ -1,33 +1,38 @@
 {
-  "version": "2.3.2.1",
-  "text_handler_controller": {
-    "accept_handling": true,
+    "version": "2.3.2.1",
+    "text_handler_controller": {
+        "accept_handling": true,
+        "accept_interface": false,
+        "accept_logging": true,
+        "accept_printing": true,
+        "accept_print_property": false
+    },
+    "db_config": {
+        "username": "postgres",
+        "password": "postgres",
+        "host": "localhost",
+        "port": 5432,
+        "db_name": "django_db"
+    },
+    "proxy": [
+        "your_proxy_address",
+        "your_proxy_address"
+    ],
+    "token_config": {
+        "vk_tokens": [
+            "9e9a3ac3f141f84ea7ace8d0759465097b32928480d7bf952536b8e334f0f48c85a8f0347564cbdd3a387",
+            "b936e531cc4d625df6248282d21d77bba4dc6fe5bdebcaf4e85de9c1451c17f7532104323174b12cb7181"
+        ],
+        "telegram_token": "your_tg_token",
+        "telegram_id": "your_tg_id"
+    },
 
-    "accept_interface": false,
-    "accept_logging": true,
-    "accept_printing": true,
-    "accept_print_property": false
-  },
-  "tokens": [
-    "your_vk_token"
-  ],
-  "telegram_token": "your_tg_token",
-  "telegram_id": "your_tg_id",
-  "proxy": [
-    "YBJ4Eq:u5HmBf@217.29.62.158:14866",
-    "YBJ4Eq:u5HmBf@217.29.62.158:14866",
-    "YBJ4Eq:u5HmBf@217.29.62.158:14866"
-  ],
-
-  "block_message_count" : 2,
-
-  "delay_response_from": 2,
-  "delay_response_to": 2,
-
-  "delay_typing_from": 1,
-  "delay_typing_to": 2,
-
-  "delay_between_messages": 0,
-
-  "delay_between_messages_for_account": 5
+    "message_config": {
+        "block_message_count": 2,
+        "delay_response_from": 2,
+        "delay_response_to": 2,
+        "delay_typing_from": 1,
+        "delay_typing_to": 2,
+        "delay_between_messages_for_account": 5
+    }
 }

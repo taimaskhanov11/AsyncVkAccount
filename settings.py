@@ -9,15 +9,18 @@ from aiovk import TokenSession
 
 __all__ = [
     'settings',
-    'text_settings',
     'bot_version',
     'ai_logic',
     'conversation_stages',
     'signs',
+    'text_settings',
+    'token_config',
+    'message_config',
+    'db_config',
 
     'vk_tokens',
-    # 'tg_token',
-    # 'tg_id',
+    'tg_token',
+    'tg_id',
     'views',
 ]
 
@@ -42,14 +45,20 @@ views = read_json('config/validators_text.json')
 
 bot_version = settings['version']
 text_settings = settings['text_handler_controller']
+token_config = settings['token_config']
+message_config = settings['message_config']
+db_config = settings['db_config']
 
 try:
-    tg_token = os.getenv('tg_token') if os.getenv('tg_token') is not None else settings['telegram_token']
-    tg_id = int(os.getenv('tg_id') if os.getenv('tg_id') is not None else int(settings['telegram_id']))
-    vk_tokens = [os.getenv('tokens')] if os.getenv('tokens') is not None else settings['tokens']
+    tg_token = os.getenv('tg_token') or token_config['telegram_token']
+    tg_id = int(os.getenv('tg_id') or token_config['telegram_id'])
+    vk_tokens = [os.getenv('tokens')] if os.getenv('tokens') else token_config['vk_tokens']
 except Exception as e:
     exp_log.exception(e)
     print('Неправильный ввод ВК или ТГ токена')
+
+# print(type(vk_tokens))
+# print(vk_tokens)
 
 signs = {
     "red": "✖",
@@ -63,7 +72,7 @@ signs = {
     "message": '✉',
     "sun": '☀',
     "tg": '⟳',
-    "number":'✆',
+    "number": '✆',
 }
 
 log_colors = {

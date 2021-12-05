@@ -11,6 +11,7 @@ class MessageHandler(asyncio.Queue):
     """
     Контролирует все процессы с полученными сообщениями
     """
+
     def __init__(self, overlord):  # todo
         super().__init__()
         self.overlord = overlord
@@ -50,10 +51,14 @@ class MessageHandler(asyncio.Queue):
     async def send_message(self, user_id: int, message: str) -> None:
         await self.overlord.vk.messages.setActivity(user_id=user_id, type='typing')
         await asyncio.sleep(random.randint(*self.overlord.delay_typing))
-
         await self.overlord.vk.messages.send(user_id=user_id,
                                              message=message,
                                              random_id=0)
+
+    async def unverified_delaying_message(self, user_id,name, text): #todo name
+        random_sleep_answer = random.randint(*self.overlord.delay_for_users)
+        await asyncio.sleep(random_sleep_answer)
+        await self.send_message(user_id, text)
 
     async def send_delaying_message(self, auth_user: BaseUser, text: str):
         """Создание отложенного сообщения"""

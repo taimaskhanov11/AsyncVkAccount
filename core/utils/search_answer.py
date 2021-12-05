@@ -13,8 +13,11 @@ async def search_answer(text, city):  # todo
         for a, b in ai_logic.items():
             if any(token in text for token in b["вход"]):
                 answer = random.choice(b['выход'])
-                if b == 'город':
-                    answer.format(city or ai_logic['негород']['выход'])
+                # print(b)
+                # print(a)
+                if a == 'город':
+                    answer = answer.format(city)
+                    # answer.format(city or ai_logic['негород']['выход'])
                 answer_end += answer + ','
         answer_end = answer_end[0:-1]
         return answer_end

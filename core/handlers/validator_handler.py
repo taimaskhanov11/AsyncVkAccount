@@ -141,4 +141,5 @@ def scr():
             # print(f'Executed time {end}')
             stats.append(end)
         except:
+            time.sleep(10)
             pass

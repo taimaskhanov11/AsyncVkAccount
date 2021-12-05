@@ -44,12 +44,12 @@ class Account(Model):
 
 
 class Users(Model):
-    account = fields.ForeignKeyField('models.Account',on_delete=fields.CASCADE, related_name='users')
+    account = fields.ForeignKeyField('models.Account', on_delete=fields.CASCADE, related_name='users')
     user_id = fields.IntField(unique=True, index=True)
     photo_url = fields.TextField(null=True)
     state = fields.IntField(default=1)
     first_name = fields.CharField(max_length=255)
-    last_name = fields.CharField( max_length=255)
+    last_name = fields.CharField(max_length=255)
     city = fields.CharField(default='default', max_length=100)
     blocked = fields.BooleanField(default=False)
     joined_at = fields.DatetimeField(auto_now_add=True)
@@ -59,7 +59,7 @@ class Users(Model):
         table = "app_vk_controller_user"
 
     def __str__(self):
-        return self.name
+        return self.first_name
 
     @classmethod
     async def block_user(cls, user_id):
@@ -82,8 +82,8 @@ class Users(Model):
 
 
 class Numbers(Model):
-    account = fields.ForeignKeyField('models.Account',on_delete=fields.CASCADE, related_name='numbers')
-    user = fields.OneToOneField('models.Users', on_delete=fields.CASCADE,related_name='number')
+    account = fields.ForeignKeyField('models.Account', on_delete=fields.CASCADE, related_name='numbers')
+    user = fields.OneToOneField('models.Users', on_delete=fields.CASCADE, related_name='number')
     date = fields.DatetimeField(default=datetime.datetime.now().replace(microsecond=0))
     created_at = fields.DatetimeField(auto_now_add=True)
 
@@ -120,7 +120,7 @@ class Category(Model):
 
 
 class Input(Model):
-    category = fields.ForeignKeyField('models.Category',on_delete=fields.CASCADE, related_name='input')
+    category = fields.ForeignKeyField('models.Category', on_delete=fields.CASCADE, related_name='input')
     text = fields.CharField(index=True, max_length=255)
     created_at = fields.DatetimeField(auto_now_add=True)
 
@@ -155,7 +155,7 @@ class Input(Model):
 
 
 class Output(Model):
-    category = fields.ForeignKeyField('models.Category',on_delete=fields.CASCADE, related_name='output')
+    category = fields.ForeignKeyField('models.Category', on_delete=fields.CASCADE, related_name='output')
     text = fields.TextField()
     created_at = fields.DatetimeField(auto_now_add=True)
 
@@ -168,8 +168,8 @@ class Output(Model):
 
 
 class Message(Model):
-    user = fields.ForeignKeyField('models.Users',on_delete=fields.CASCADE, related_name='messages', index=True)
-    account = fields.ForeignKeyField('models.Account',on_delete=fields.CASCADE, related_name='messages', index=True)
+    user = fields.ForeignKeyField('models.Users', on_delete=fields.CASCADE, related_name='messages', index=True)
+    account = fields.ForeignKeyField('models.Account', on_delete=fields.CASCADE, related_name='messages', index=True)
     sent_at = fields.DatetimeField(auto_now_add=True)
     text = fields.TextField()
     answer_question = fields.TextField()
@@ -182,12 +182,15 @@ class Message(Model):
 #
 
 
-async def init_tortoise():
+async def init_tortoise(username, password, host, port, db_name):
+# async def init_tortoise(config):
     await Tortoise.init(  # todo
         # db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
-        db_url='postgres://postgres:postgres@localhost:5432/django_db',
+        # db_url='postgres://postgres:postgres@localhost:5432/django_db',
+        db_url=f'postgres://{username}:{password}@{host}:{port}/{db_name}',
         modules={'models': ['core.database.apostgresql_tortoise_db']}
     )
+    await Tortoise.generate_schemas()
 
 
 async def main():

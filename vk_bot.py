@@ -4,6 +4,7 @@ import multiprocessing
 import random
 import threading
 import time
+from pprint import pprint
 
 from aiogram import Bot
 from aiovk import API, TokenSession
@@ -20,9 +21,10 @@ from core.database import Account, Input, Message, Users, init_tortoise
 from core.handlers.log_handler import log_handler
 from core.handlers.text_handler import text_handler
 from core.log_settings import exp_log, not_answer_log
-from core.utils import find_most_city
+from core.utils import find_most_city, search_answer
 from core.validators import Validator
 from settings import *
+from settings import message_config
 
 colorama_init()
 
@@ -67,10 +69,11 @@ class AdminAccount:
         self.start_status = True
 
         self.state_answer_count = len(conversation_stages) + 4
-        self.block_message_count = settings['block_message_count']
-        self.delay_for_users = (settings['delay_response_from'], settings['delay_response_to'])
-        self.delay_typing = (settings['delay_typing_from'], settings['delay_typing_to'])
-        self.delay_for_acc = settings['delay_between_messages_for_account']
+
+        self.block_message_count = message_config['block_message_count']
+        self.delay_for_users = (message_config['delay_response_from'], message_config['delay_response_to'])
+        self.delay_typing = (message_config['delay_typing_from'], message_config['delay_typing_to'])
+        self.delay_for_acc = message_config['delay_between_messages_for_account']
 
         self.message_handler = MessageHandler(self)
 
@@ -132,7 +135,8 @@ class AdminAccount:
         """Формирование ответа пользователю"""
         template = await auth_user.act(text)  # todo
         if template:
-            answer = await Input.find_output(text, auth_user.city)
+            # answer = await Input.find_output(text, auth_user.city)
+            answer = await search_answer(text, auth_user.city)
             if not answer:
                 await asyncio.to_thread(
                     not_answer_log.warning, f'{auth_user.user_id} {auth_user.name} --> {text}'
@@ -192,7 +196,7 @@ class AdminAccount:
                 if self.db_account.start_status:
                     self.start_status = True
 
-    async def check_friend_status(self, user_id: int, can_access_closed: bool) -> bool:
+    async def check_friend_status(self, user_id: int, name: str, can_access_closed: bool) -> bool:
         """Проверка статуса дружбы"""
         add_status = await self.vk.friends.areFriends(user_ids=user_id)
         add_status = add_status[0]['friend_status']
@@ -208,12 +212,24 @@ class AdminAccount:
             )
             return True
         if not can_access_closed:
+            self.users_block[user_id] += 1
+            if self.users_block[user_id] > 1:
+                return False
+
             match add_status:
                 case 0:
-                    await self.message_handler.send_message(user_id, random.choice(
-                        ai_logic['private']['выход']))
+                    asyncio.create_task(
+                        self.message_handler.unverified_delaying_message(
+                            user_id, name, random.choice(ai_logic['private']['выход'])
+                        )
+                    )
                 case 1:
-                    await self.message_handler.send_message(user_id, ai_logic['просьба принять заявку']['выход'])
+                    asyncio.create_task(
+                        self.message_handler.unverified_delaying_message(
+                            user_id, name, ai_logic['просьба принять заявку']['выход']
+                        )
+                    )
+
             return False
         return True
 
@@ -255,13 +271,13 @@ class AdminAccount:
         first_name = user_info['first_name']
         last_name = user_info['last_name']
         photo_url = user_info.get('photo_max_orig', 'без фото')
-        print(user_info)
+        pprint(user_info)
         await asyncio.to_thread(text_handler, signs['green'],
                                 f'Новое сообщение от {first_name}/{user_id}/Нету в базе - {text}',
                                 'warning')
 
         # todo if all(map(lambda x: x(), [func1, func2]))
-        friend_status = await self.check_friend_status(user_id, user_info["can_access_closed"])
+        friend_status = await self.check_friend_status(user_id, first_name, user_info["can_access_closed"])
         if not friend_status:
             return False
 
@@ -342,11 +358,10 @@ class AdminAccount:
             if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text and event.from_user:
                 self.loop.create_task(self.event_analysis(event))  # Создания задачи Анализ события
 
-
     async def run_session(self):
         """Запуст и выгрузка основных данных"""
         # Инициализация базы данных
-        await init_tortoise()
+        await init_tortoise(*db_config.values())
         # Выгрузка пользователей
         await self.unloading_from_database()
 
@@ -379,23 +394,21 @@ class AdminAccount:
 
 
 # @log_handler
-async def upload_all_data_main(statusbar=False):
+def upload_all_data_main(statusbar=False):
     """Инициализация данных профиля и сохранений в базе"""
     try:
 
         text_handler(f"VkBot v{bot_version}", '', color='blue')
-
         text_handler(signs['magenta'], f'Загруженно токенов {len(vk_tokens)}: ', color='magenta')
         for a, b in enumerate(vk_tokens, 1):
             text_handler(signs['magenta'], f"    {b}", color='magenta')
 
-        delay = f"[{settings['delay_response_from']} - {settings['delay_response_to']}] s"
+        delay = f"[{message_config['delay_response_from']} - {message_config['delay_response_to']}] s"
         text_handler(signs['magenta'], f"    Задержка перед ответом : {delay}", color='cyan')
-        delay = f"[{settings['delay_typing_from']} - {settings['delay_typing_to']}] s"
+        delay = f"[{message_config['delay_typing_from']} - {message_config['delay_typing_to']}] s"
         text_handler(signs['magenta'], f"    Длительность отображения печати : {delay}", color='cyan')
 
         # Выгрузка стадий и юзеров
-        # await unloading_from_database()
 
         # todo
         text_handler(signs['magenta'], 'Проверка прокси:', color='magenta')
