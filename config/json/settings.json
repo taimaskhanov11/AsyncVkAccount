@@ -21,10 +21,12 @@
     "token_config": {
         "vk_tokens": [
             "9e9a3ac3f141f84ea7ace8d0759465097b32928480d7bf952536b8e334f0f48c85a8f0347564cbdd3a387",
-            "b936e531cc4d625df6248282d21d77bba4dc6fe5bdebcaf4e85de9c1451c17f7532104323174b12cb7181"
+            "b936e531cc4d625df6248282d21d77bba4dc6fe5bdebcaf4e85de9c1451c17f7532104323174b12cb7181",
+                        "875ab88f478f48d9d8a9a94c35a2af92e4c2993ffc6de1fc1981585e2033d72f7fe8b536673f6565ed99f"
+
         ],
         "telegram_token": "your_tg_token",
-        "telegram_id": "your_tg_id"
+        "telegram_id": 1234123412
     },
 
     "message_config": {

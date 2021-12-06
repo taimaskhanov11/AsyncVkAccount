@@ -1,11 +1,9 @@
 import asyncio
 import multiprocessing
 from multiprocessing import Process
-from threading import Thread
 
 from settings import tg_id, tg_token, vk_tokens
 from vk_bot import AdminAccount, upload_all_data_main
-from core.handlers.validator_handler import scr, skd
 
 
 def split_list(a_list):
@@ -14,23 +12,34 @@ def split_list(a_list):
 
 
 async def main(token):
-    await upload_all_data_main(statusbar=False)
     vk = AdminAccount(token, tg_token, tg_id)
     await vk.run_session()
 
 
 def start(token):
+    loop = asyncio.new_event_loop()
     # loop = asyncio.get_event_loop()
-    # loop.run_until_complete(main(token))
-    asyncio.run(main(token))
+    # asyncio.set_event_loop(loop)
+    loop.run_until_complete(main(token))
+    # loop = asyncio.get_event_loop()
+    # print(loop)
+    # asyncio.new_event_loop()
+    # asyncio.run(main(token))
 
 
 def multi_main():
-    # Thread(target=scr).start()
-    # Thread(target=skd).start()
+    # Thread(target=scr, daemon=True).start()
+    # Thread(target=skd, daemon=True).start()
+
+    upload_all_data_main(statusbar=False)
     if len(vk_tokens) > 1:
-        for token in vk_tokens:
-            Process(target=start, args=(token,)).start()
+        processes = [Process(target=start, args=(token,)) for token in vk_tokens]
+        [pr.start() for pr in processes]
+
+        # while True:
+        #     time.sleep(0.5)
+        #     for i in processes:
+        #         print(i.is_alive())
     else:
         print("Один токен")
         start(vk_tokens[0])

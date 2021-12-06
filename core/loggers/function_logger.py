@@ -7,7 +7,7 @@ import time
 from core.handlers.text_handler import text_handler
 from settings import settings, signs
 
-accept_handling = settings['text_handler_controller']['accept_handling'] #todo
+accept_handling = settings['text_handler_controller']['accept_handling']  # todo
 
 
 class FunctionLogger:
@@ -18,10 +18,23 @@ class FunctionLogger:
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
-                now = time.monotonic()
+
+                now = time.monotonic()  # todo
+                # await asyncio.to_thread(text_handler, signs['tg'], f'НАЧАЛО {func.__name__}|{args} {kwargs}', 'info',
+                #                         prop=True)
+
+                # text_handler( signs['tg'], f'НАЧАЛО {func.__name__}|{args} {kwargs}', 'info',
+                #                         prop=True)
                 res = await func(*args, **kwargs)
+                # await asyncio.to_thread(text_handler, signs['tg'], f'КОНЕЦ {func.__name__}|{args} {kwargs}', 'info',
+                #                         prop=True)
+
+                # text_handler( signs['tg'], f'КОНЕЦ {func.__name__}|{args} {kwargs}', 'info',
+                #                         prop=True)
+
                 end = time.monotonic() - now
-                execute_time = f'{"Executed time"} {end} s'
+
+                execute_time = f'{"Executed time"} {round(end, 5)}'
                 func_name = f'{path}/{func.__name__}'
                 # print(func.__name__)
                 # print(func)
@@ -29,20 +42,30 @@ class FunctionLogger:
                 # print(text_handler)
                 # print(path)
                 if accept_handling:
-                    await asyncio.to_thread(text_handler, signs['time'], f'{func_name:<36} {execute_time} | async',
+                    await asyncio.to_thread(text_handler, signs['time'],
+                                            f'{func_name:<36} {execute_time:<19} {"|async":<6}| {args} {kwargs} ',
                                             'debug',
                                             off_interface=True, talk=False, prop=True)
+                    # text_handler(signs['time'],
+                    #              f'{func_name:<36} {execute_time:<19} {"|async":<6}| {args} {kwargs} ',
+                    #              'debug',
+                    #              off_interface=True, talk=False, prop=True)
                 return res
 
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
                 now = time.monotonic()
+
+                # text_handler(signs['tg'], f'НАЧАЛО {func.__name__}|{args} {kwargs}', 'info', prop=True)
                 res = func(*args, **kwargs)
+                # text_handler(signs['tg'], f'КОНЕЦ {func.__name__}|{args} {kwargs}', 'info', prop=True)
+
                 end = time.monotonic() - now
-                execute_time = f'{"Executed time"} {end} s'
+                execute_time = f'{"Executed time"} {round(end, 5)}'
                 func_name = f'{path}/{func.__name__}'
                 if accept_handling:
-                    text_handler(signs['time'], f'{func_name:<36} {execute_time} | sync', 'debug',
+                    text_handler(signs['time'], f'{func_name:<36} {execute_time:<19} {"|sync":<6}| {args} {kwargs}',
+                                 'debug',
                                  off_interface=True, talk=False, prop=True)
                 return res
 

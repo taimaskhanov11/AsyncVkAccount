@@ -10,6 +10,12 @@ from core.handlers import text_handler
 from settings import conversation_stages, signs
 
 
+class TransparentUser:
+
+    def __init__(self):
+        pass
+
+
 class BaseUser:
     def __init__(self, user_id: int, db_user: Users, overlord, state: int, name: str, city: str):
         self.overlord = overlord
@@ -23,6 +29,9 @@ class BaseUser:
         self.half_template = self.len_template // 2
         self.block_template = 0
         self.last_answer_time = 0
+
+    # def __str__(self):
+    #     return self.name
 
     async def add_state(self):
         self.state += 1

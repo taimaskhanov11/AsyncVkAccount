@@ -1,0 +1,62 @@
+# Текущая версия бота
+version: 2.4.0.3
+
+# Логирование
+text_handler_controller:
+    accept_handling: true
+    accept_interface: false
+    accept_logging: true
+    accept_printing: true
+    accept_print_property: false
+
+
+# База данных
+db_config:
+    username: postgres
+    password: postgres
+    host: localhost
+    port: 5432
+    db_name: "django_db"
+
+
+# Настройки прокси
+proxy:
+    - your_proxy_address
+    - your_proxy_address
+
+
+# Настройки токенов
+token_config:
+
+    # Токены вк
+    vk_tokens:
+        - 9e9a3ac3f141f84ea7ace8d0759465097b32928480d7bf952536b8e334f0f48c85a8f0347564cbdd3a387
+        - b936e531cc4d625df6248282d21d77bba4dc6fe5bdebcaf4e85de9c1451c17f7532104323174b12cb7181
+        - 875ab88f478f48d9d8a9a94c35a2af92e4c2993ffc6de1fc1981585e2033d72f7fe8b536673f6565ed99f
+
+    # Токен телеграмма
+    telegram_token: your_tg_token
+
+    # IDs телеграмма куда отправляются данные
+    telegram_id: 1234123412
+
+
+# Настройки сообщений
+message_config:
+
+    # Блокировка от спама.
+    # Количество одновременных сообщений после которых ставиться блокировка
+    #   сообщений для пользователя до отправки ему ответа
+    block_message_count: 2
+
+    # Задержка сообщения для каждого пользователя в секундах
+    delay_response_from: 2
+    delay_response_to: 2
+
+    # Время отображния иконки печати
+    delay_typing_from: 1  # от
+    delay_typing_to: 2    # до
+
+    # Задержка между отправкой сообщений из очереди, 8 это оптимальный вариант.
+    # Менять только если начали банить вк или при крайней необходимости
+    delay_between_messages_for_account: 8

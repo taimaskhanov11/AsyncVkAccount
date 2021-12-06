@@ -9,7 +9,7 @@ _ todo MAIN
 # todo работать отправку для челов с закр акками
 # todo дописать reade.me
 # todo добавить yaml
-
+# todo исправить while в цикле
 
 
 # todo добавить type hinting

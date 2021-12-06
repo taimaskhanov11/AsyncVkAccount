@@ -183,7 +183,7 @@ class Message(Model):
 
 
 async def init_tortoise(username, password, host, port, db_name):
-# async def init_tortoise(config):
+    # async def init_tortoise(config):
     await Tortoise.init(  # todo
         # db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
         # db_url='postgres://postgres:postgres@localhost:5432/django_db',
@@ -228,8 +228,32 @@ async def djagno_init():
     await Tortoise.generate_schemas()
 
 
-log_handler.init_choice_logging(__name__,
-                                *__all__)
+async def djagno_init_test():
+    await Tortoise.init(
+        db_url='postgres://postgres:postgres@localhost:5432/django_db',
+        modules={'models': ['__main__']}
+    )
+    await Tortoise.generate_schemas()
+    user_id = 408048349
+    first_name = 'Женя'
+    last_name = 'Иванов'
+    mode = 'True'
+    city = 'Санкт'
+    photo_url = 'https://sun1-99.userapi.com/s/v1/ig1/ZIb7e7nJsSnBgDzR2JAQiLesFfE5Qmv-tfOlLOWzVAeul1EoA0L4WC7dVJBZVWG6K15SzfyB.jpg?size=400x400&quality=96&crop=20,20,559,560&ava=1'
+    account = await Account.get(id=1)
+    db_user = await Users.create(
+        account=account,
+        user_id=user_id,
+        photo_url=photo_url,
+        first_name=first_name,
+        last_name=last_name,
+        city=city,
+        blocked=not mode
+    )
+
+
+# log_handler.init_choice_logging(__name__,
+#                                 *__all__)
 
 if __name__ == '__main__':
-    run_async(djagno_init())
+    run_async(djagno_init_test())

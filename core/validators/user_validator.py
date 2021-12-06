@@ -5,7 +5,7 @@ from core.log_settings import exp_log
 from settings import signs
 
 
-class Validator:
+class UserValidator:
 
     def __init__(self):
         self.validators = (
@@ -84,4 +84,4 @@ class Validator:
             return True
 
 
-Validator = validator_handler(Validator)
+Validator = validator_handler(UserValidator)

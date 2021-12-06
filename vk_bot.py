@@ -22,9 +22,8 @@ from core.handlers.log_handler import log_handler
 from core.handlers.text_handler import text_handler
 from core.log_settings import exp_log, not_answer_log
 from core.utils import find_most_city, search_answer
-from core.validators import Validator
+from core.validators import UserValidator, MessageValidator
 from settings import *
-from settings import message_config
 
 colorama_init()
 
@@ -57,7 +56,8 @@ class AdminAccount:
         self.unverified_users = []
         self.verifying_users = []
 
-        self.validator = Validator()
+        self.validator = UserValidator()
+        self.message_validator = MessageValidator(bad_words)
         self.logger = LogMessage()  # todo
 
         self.longpoll = UserLongPoll(self.vk, mode=1, version=3)
@@ -76,6 +76,9 @@ class AdminAccount:
         self.delay_for_acc = message_config['delay_between_messages_for_account']
 
         self.message_handler = MessageHandler(self)
+
+    # def __str__(self):
+    #     return self.info['first_name']
 
     async def unloading_from_database(self):  # todo
         """Выгружает пользователей из базы в переменную"""
@@ -122,18 +125,28 @@ class AdminAccount:
             self.db_account = db_account[0]
             text_handler(signs['version'], f'{self.info["first_name"]} {self.info["last_name"]}', color='yellow')
         except VkAuthError as e:
-            await asyncio.gather(
-                asyncio.to_thread(self.block_account_message),
-                asyncio.to_thread(exp_log.error, e)
-            )
-            exit()
+            # await asyncio.gather(
+            #     asyncio.to_thread(self.block_account_message),
+            #     asyncio.to_thread(exp_log.error, e)
+            #     asyncio.to_thread(exp_log.exception, e)
+            # )
+            self.block_account_message()
+            # exp_log.error(e)
+            exp_log.critical(f'Ошибка токена {self.token}')
+            # exp_log.critical('2')
+            # logging.exception('ОШИБКА')
+            # exp_log.exception('ОШИБКА')
+            # text_handler(signs['red'],'ОШИБКА', 'exception' )
+            raise
 
     def parse_event(self, raw_event: list) -> Event:
         return self.DEFAULT_EVENT_CLASS(raw_event)
 
     async def create_answer(self, text: str, auth_user: BaseUser, table_user: Users) -> None:
         """Формирование ответа пользователю"""
+        print(text)
         template = await auth_user.act(text)  # todo
+
         if template:
             # answer = await Input.find_output(text, auth_user.city)
             answer = await search_answer(text, auth_user.city)
@@ -158,11 +171,8 @@ class AdminAccount:
         await self.message_handler.save_message(table_user, text, answer, template)
 
     def block_account_message(self):
-        text_handler(signs['red'], 'Ошибка авторизации!!!', 'error')
-        text_handler(signs['yellow'], 'Возможно вы ввели неправильный токен или аккаунт ЗАБЛОКИРОВАН!', 'error',
+        text_handler(signs['version'], f'Ошибка токена {self.token}', 'error',
                      color='red')
-        text_handler(signs['version'], f'Ваш токен {self.token}',
-                     'error', color='red')
 
     async def update_users(self, user_id: int,
                            first_name: str,
@@ -170,6 +180,7 @@ class AdminAccount:
                            mode: bool = True, city: str = 'None',
                            photo_url: str = 'Нет фото') -> tuple[BaseUser, Users]:  # todo убрать
         """Создание объекта пользователя и сохранение в бд"""
+        # pprint([user_id, first_name, last_name, mode, city, photo_url])
         db_user = await Users.create(
             account=self.db_account,
             user_id=user_id,
@@ -179,7 +190,9 @@ class AdminAccount:
             city=city,
             blocked=not mode
         )
+
         user_object = BaseUser(user_id, db_user, self, 0, first_name, city)
+
         self.users_objects[user_id] = user_object
         self.verified_users.append(user_id) if mode else self.unverified_users.append(user_id)
         return user_object, db_user
@@ -187,7 +200,6 @@ class AdminAccount:
     async def check_signals(self):
         while True:
             await asyncio.sleep(5)
-
             await self.db_account.refresh_from_db(fields=['start_status'])
             if self.start_status:
                 if not self.db_account.start_status:
@@ -211,6 +223,7 @@ class AdminAccount:
                 )
             )
             return True
+
         if not can_access_closed:
             self.users_block[user_id] += 1
             if self.users_block[user_id] > 1:
@@ -238,14 +251,28 @@ class AdminAccount:
                      f'Новое сообщение от {auth_user.name}/Черный список/: {text}',
                      'error')
 
-    async def create_response(self, text: str, user_id: int) -> None:
+    async def add_to_blacklist(self, user_id: int):
+        self.unverified_users.append(user_id)
+        await Users.block_user(user_id)
+
+    async def create_response(self, user_id: int, text: str) -> None:
         """Идентификация и обработка пользователя"""
-        auth_user = self.users_objects[user_id]
-        db_user = await Users.get(user_id=auth_user.user_id)  # todo
-        if auth_user.state > self.state_answer_count:
-            self.unverified_users.append(auth_user.user_id)
+
+        auth_user: BaseUser = self.users_objects[user_id]
+        db_user: Users = await Users.get(user_id=auth_user.user_id)  # todo
+
+        if self.message_validator.check_for_bad_words(text):
+
             await asyncio.gather(
-                Users.block_user(auth_user.user_id),
+                self.add_to_blacklist(user_id),
+                asyncio.to_thread(text_handler, signs['red'],
+                                  f'{auth_user.name}/{auth_user.user_id}|Запрещенное слово, добавлен в unverified_users',
+                                  'error')
+            )
+
+        elif auth_user.state > self.state_answer_count:
+            await self.add_to_blacklist(user_id)
+            await asyncio.gather(
                 asyncio.to_thread(self.blacklist_message, auth_user, text)
             )
 
@@ -271,7 +298,7 @@ class AdminAccount:
         first_name = user_info['first_name']
         last_name = user_info['last_name']
         photo_url = user_info.get('photo_max_orig', 'без фото')
-        pprint(user_info)
+        # pprint(user_info)
         await asyncio.to_thread(text_handler, signs['green'],
                                 f'Новое сообщение от {first_name}/{user_id}/Нету в базе - {text}',
                                 'warning')
@@ -294,7 +321,6 @@ class AdminAccount:
             await asyncio.to_thread(text_handler, signs['mark'],
                                     f'{user_id} / {first_name} / Прошел все проверки / Добавлен в verified_users',
                                     'info')
-
             return auth_user, table_user
         else:
             await asyncio.gather(
@@ -304,52 +330,64 @@ class AdminAccount:
                                   f'{user_id}/{first_name}/Проверку не прошел/Добавлен в unverified_users',
                                   'error')
             )
+
             return False
+
+    async def wait_for_verification(self, user_id: int, delay: int) -> None:
+        await asyncio.gather(
+            asyncio.to_thread(
+                text_handler, signs['time'], f'Ожидаем завершения проверки {user_id} 1 sec', 'warning', 'cyan'
+            ),
+            asyncio.to_thread(
+                exp_log.error(f'Ожидаем завершения проверки {user_id} 1 sec')
+            ),
+            asyncio.sleep(delay)  # todo
+        )
+
+    async def for_unverified_users(self, user_id: int, text: str):
+        auth_user = self.users_objects[user_id]
+        table_user = await Users.get(user_id=auth_user.user_id)  # todo
+        await asyncio.gather(
+            self.message_handler.save_message(table_user, text, 'ЧС', 'ЧС'),  # todo
+            asyncio.to_thread(self.blacklist_message, auth_user, text)
+        )
+
+    async def identification(self, user_id: int, text: str) -> None:
+        # Если нету в базе
+        self.verifying_users.append(user_id)
+        # await asyncio.sleep(2)
+        verified = await self.verify_user(user_id, text)
+        if verified:
+            await self.create_answer(text, *verified)
+        self.verifying_users.remove(user_id)
 
     async def event_analysis(self, event: Event) -> None:
         """Разбор события"""
         text = event.text.lower()
         user_id = event.user_id
 
-        while user_id in self.verifying_users:  # Ожидаем завершения проверки
-            await asyncio.gather(
-                asyncio.to_thread(
-                    text_handler, signs['time'], f'Ожидаем завершения проверки {user_id} 1 sec', 'warning', 'cyan'
-                ),
-                asyncio.sleep(1)
-            )
+        if user_id in self.verifying_users:  # Ожидаем завершения проверки
+            await self.wait_for_verification(user_id, 3)
 
         res_time_track = ResponseTimeTrack(user_id)
 
         if user_id in self.unverified_users:
-            auth_user = self.users_objects[user_id]
-            table_user = await Users.get(user_id=auth_user.user_id)  # todo
-            await asyncio.gather(
-                self.message_handler.save_message(table_user, text, 'ЧС', 'ЧС'),  # todo
-                asyncio.to_thread(self.blacklist_message, auth_user, text)
-            )
+            await self.for_unverified_users(user_id, text)
 
         elif user_id in self.verified_users:
-            await self.create_response(text, user_id)  # Создание ответа
+            await self.create_response(user_id, text)  # Создание ответа
             res_time_track.stop()
 
         else:
-            # Если нету в базе
-            self.verifying_users.append(user_id)
-            # await asyncio.sleep(2)
-            verified = await self.verify_user(user_id, text)
-            if verified:
-                await self.create_answer(text, *verified)
-
-            self.verifying_users.remove(user_id)
+            await self.identification(user_id, text)
 
         res_time_track.stop(check=True)
 
     async def parse_message_event(self):
         async for event_a in self.longpoll.iter():
-            if self.signal_end:
-                print(f'{self.info["first_name"]} Остановка цикла событий!')
-                break
+            # if self.signal_end:
+            #     print(f'{self.info["first_name"]} Остановка цикла событий!') # todo
+            #     break
             if event_a[0] != 4:
                 continue
 
@@ -368,20 +406,25 @@ class AdminAccount:
         text_handler(signs['queue'], f'Текущий цик событий {asyncio.get_event_loop()}', color='magenta')
         text_handler(signs['queue'], f'Текущий поток {multiprocessing.current_process()}, {threading.current_thread()}',
                      color='magenta')  # todo
-        await self.get_self_info()
 
-        # print(self.info)
-        asyncio.create_task(self.message_handler.run_worker())  # Запуск обработчтк сообщений
+        try:
+            await self.get_self_info()
+        except:
+            return
+            # print(self.info)
+        asyncio.create_task(self.message_handler.run_worker())  # Запуск обработчика сообщений
 
         while True:
             try:
-                await self.parse_message_event()
+
+                await self.parse_message_event()  # парс события
 
                 while self.signal_end:
                     await asyncio.sleep(5)
 
             except VkAuthError as e:
                 exp_log.error(e)
+                self.block_account_message()
                 await asyncio.gather(asyncio.to_thread(self.block_account_message),
                                      Account.blocking(self.info['id']), return_exceptions=True)
                 return
@@ -389,7 +432,7 @@ class AdminAccount:
             except Exception as e:
                 await asyncio.gather(
                     asyncio.to_thread(text_handler, signs['red'], 'ПЕРЕПОДКЛЮЧЕНИЕ...', 'error'),
-                    asyncio.to_thread(exp_log.warning, e)
+                    asyncio.to_thread(exp_log.exception, e)
                 )
 
 
