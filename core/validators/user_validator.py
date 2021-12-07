@@ -57,8 +57,8 @@ class UserValidator:
             else:
                 return True  # todo
         except Exception as e:
-            exp_log.exception(e)
-            text_handler(signs['red'], 'Ошибка при проверке возраста', 'error')
+            # exp_log.exception(e)
+            text_handler(signs['red'], f'Неккоректный возраст {age}', 'error')
             return True
 
     def count_friends_validator(self, count: int) -> bool:

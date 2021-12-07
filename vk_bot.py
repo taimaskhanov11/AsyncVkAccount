@@ -10,6 +10,7 @@ from aiogram import Bot
 from aiovk import API, TokenSession
 from aiovk.exceptions import VkAuthError
 from aiovk.longpoll import UserLongPoll
+
 from colorama import init as colorama_init
 from tqdm import trange
 from vk_api.longpoll import Event, VkEventType
@@ -21,7 +22,7 @@ from core.database import Account, Input, Message, Users, init_tortoise
 from core.handlers.log_handler import log_handler
 from core.handlers.text_handler import text_handler
 from core.log_settings import exp_log, not_answer_log
-from core.utils import find_most_city, search_answer
+from core.utils import find_most_city
 from core.validators import UserValidator, MessageValidator
 from settings import *
 
@@ -37,7 +38,7 @@ __all__ = [
 class AdminAccount:
     """Котролирует все процессы над аккаунтом"""
 
-    def __init__(self, vk_token, tg_token, tg_user_id):
+    def __init__(self, vk_token: str, tg_token: str, tg_user_id: int):
         """
         :param vk_token: Токен аккаунта вк для создания сессии
         :param tg_token: Токен телеграмма для отправки номеров
@@ -47,7 +48,7 @@ class AdminAccount:
         self.loop = asyncio.get_event_loop()
         # self.driver = HttpDriver(loop=loop) if loop else None
         self.session = TokenSession(self.token)
-        self.vk = API(self.session)
+        self.api = API(self.session)
         self.tg_bot = Bot(token=tg_token)
         self.tg_user_id = tg_user_id
 
@@ -59,8 +60,9 @@ class AdminAccount:
         self.validator = UserValidator()
         self.message_validator = MessageValidator(bad_words)
         self.logger = LogMessage()  # todo
+        self.message_handler = MessageHandler(self)
 
-        self.longpoll = UserLongPoll(self.vk, mode=1, version=3)
+        self.longpoll = UserLongPoll(self.api, mode=1, version=3)
         self.users_block = collections.defaultdict(int)
         self.DEFAULT_EVENT_CLASS = Event
         self.info = None
@@ -75,7 +77,7 @@ class AdminAccount:
         self.delay_typing = (message_config['delay_typing_from'], message_config['delay_typing_to'])
         self.delay_for_acc = message_config['delay_between_messages_for_account']
 
-        self.message_handler = MessageHandler(self)
+
 
     # def __str__(self):
     #     return self.info['first_name']
@@ -97,12 +99,12 @@ class AdminAccount:
 
     async def get_user_info(self, user_id: int) -> dict:
         # res = await self.vk.users.get(user_ids=user_id, fields=['bdate', 'sex', 'has_photo', 'city'])
-        res = await self.vk.users.get(user_ids=user_id,
-                                      fields='sex, bdate, has_photo, city, photo_max_orig')
+        res = await self.api.users.get(user_ids=user_id,
+                                       fields='sex, bdate, has_photo, city, photo_max_orig')
         return res[0]
 
     async def get_friend_info(self, user_id: int) -> dict:
-        return await self.vk.friends.search(user_id=user_id, fields="sex, city", count=1000)
+        return await self.api.friends.search(user_id=user_id, fields="sex, city", count=1000)
 
     def user_info_view(self, info, count_friend, age, has_photo):
         text_handler(signs['yellow'], f"{info['first_name']}, {info['last_name']}, {info['id']}", 'warning')
@@ -112,7 +114,7 @@ class AdminAccount:
 
     async def get_self_info(self):
         try:
-            res = await self.vk.users.get(fields=['photo_max_orig'])
+            res = await self.api.users.get(fields=['photo_max_orig'])
             self.info = res[0]
             db_account = await Account.get_or_create(
                 user_id=self.info['id'], defaults={
@@ -144,12 +146,14 @@ class AdminAccount:
 
     async def create_answer(self, text: str, auth_user: BaseUser, table_user: Users) -> None:
         """Формирование ответа пользователю"""
-        print(text)
+        # print(text)
         template = await auth_user.act(text)  # todo
 
         if template:
             # answer = await Input.find_output(text, auth_user.city)
-            answer = await search_answer(text, auth_user.city)
+            # answer, attachment = await search_answer(text, auth_user.city)
+            answer, attachment = await self.message_handler.search_answer(text, auth_user.city)
+            # print(attachment)
             if not answer:
                 await asyncio.to_thread(
                     not_answer_log.warning, f'{auth_user.user_id} {auth_user.name} --> {text}'
@@ -158,17 +162,18 @@ class AdminAccount:
             current_answer = f'{answer} {template}'
             answer = answer or '<ответ не найден>'
             # Создание сообщения
-            self.loop.create_task(self.message_handler.send_delaying_message(auth_user, current_answer))
+            self.loop.create_task(self.message_handler.send_delaying_message(auth_user, current_answer, attachment))
 
         else:
             answer = 'Игнор/Проверка на номер'
+            attachment = ''
             template = 'Игнор/Проверка на номер'
             await asyncio.to_thread(text_handler, signs['red'],
                                     f"{auth_user.user_id} / {auth_user.name}"
                                     f" / Стадия 7 или больше / Игнор / Проверка на номер ",
                                     'error')
 
-        await self.message_handler.save_message(table_user, text, answer, template)
+        await self.message_handler.save_message(table_user, text, f'{answer}>{attachment}', template)
 
     def block_account_message(self):
         text_handler(signs['version'], f'Ошибка токена {self.token}', 'error',
@@ -210,14 +215,14 @@ class AdminAccount:
 
     async def check_friend_status(self, user_id: int, name: str, can_access_closed: bool) -> bool:
         """Проверка статуса дружбы"""
-        add_status = await self.vk.friends.areFriends(user_ids=user_id)
+        add_status = await self.api.friends.areFriends(user_ids=user_id)
         add_status = add_status[0]['friend_status']
 
         await asyncio.to_thread(text_handler, signs['yellow'], f"Статус дружбы {add_status}", 'warning')
 
         if add_status == 2:
             await asyncio.gather(
-                self.vk.friends.add(user_id=user_id),
+                self.api.friends.add(user_id=user_id),
                 asyncio.to_thread(
                     text_handler, signs['yellow'], f"Добавление в друзья", 'warning'
                 )
@@ -262,7 +267,6 @@ class AdminAccount:
         db_user: Users = await Users.get(user_id=auth_user.user_id)  # todo
 
         if self.message_validator.check_for_bad_words(text):
-
             await asyncio.gather(
                 self.add_to_blacklist(user_id),
                 asyncio.to_thread(text_handler, signs['red'],
@@ -280,7 +284,7 @@ class AdminAccount:
             await asyncio.gather(
                 self.create_answer(text, auth_user, db_user),  # Создание ответа
                 asyncio.to_thread(text_handler, signs['green'],
-                                  f'Новое сообщение от {auth_user.name} / {user_id} - {text}',
+                                  f'Новое сообщение от {auth_user.name} / {user_id} - {text[:40]}...',
                                   'info')  # todo
             )
 
@@ -403,6 +407,7 @@ class AdminAccount:
         # Выгрузка пользователей
         await self.unloading_from_database()
 
+
         text_handler(signs['queue'], f'Текущий цик событий {asyncio.get_event_loop()}', color='magenta')
         text_handler(signs['queue'], f'Текущий поток {multiprocessing.current_process()}, {threading.current_thread()}',
                      color='magenta')  # todo
@@ -412,6 +417,10 @@ class AdminAccount:
         except:
             return
             # print(self.info)
+
+        # Выгрузка фото
+        await self.message_handler.uploaded_photo_from_dir()
+
         asyncio.create_task(self.message_handler.run_worker())  # Запуск обработчика сообщений
 
         while True:
@@ -434,6 +443,8 @@ class AdminAccount:
                     asyncio.to_thread(text_handler, signs['red'], 'ПЕРЕПОДКЛЮЧЕНИЕ...', 'error'),
                     asyncio.to_thread(exp_log.exception, e)
                 )
+            finally:
+                await self.session.close()
 
 
 # @log_handler

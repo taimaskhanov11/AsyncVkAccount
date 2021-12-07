@@ -13,22 +13,17 @@ text_handler_controller:
 # База данных
 db_config:
     username: postgres
-    password: postres
+    password: postgres
     host: localhost
     port: 5432
-    db_name: "django_db"
+    db_name: django_db
 
 
 # Настройки прокси
 proxy:
-    - 83.171.215.165:30009#isaeva_vic2000_gmail:2f03222b17
-    - 83.171.214.85:30009#isaeva_vic2000_gmail:2f03222b17
-    - 83.171.215.100:30009#isaeva_vic2000_gmail:2f03222b17
-    - 83.171.215.165:30009#isaeva_vic2000_gmail:2f03222b17
-    - 83.171.215.164:30009#isaeva_vic2000_gmail:2f03222b17
-    - 83.171.213.210:30009#isaeva_vic2000_gmail:2f03222b17
-    - 83.171.215.192:30009#isaeva_vic2000_gmail:2f03222b17
-    - 45.140.74.200:30009#isaeva_vic2000_gmail:2f03222b17
+    - your_proxy_address
+    - your_proxy_address
+
 
 
 # Настройки токенов
@@ -36,20 +31,15 @@ token_config:
 
     # Токены вк
     vk_tokens:
-        - 9f246c4fee2f8892d5f0f467ea4887fdf7d1137417c8fa087bffb0f559302d312f26865d2f8f77fe9ef5d
-        - 868b2118ed728c0db5538d7646566ea8f46bb23baf60e61e1b35d01b2c68b106516ec8f1963439bcc78dd
-        - 5f156bb097b970624e029cde4c318e7bf9b370482eb465faa2844ebc3db12b78ef8f7138ea80373f31779
-        - fcb968dcaa627520d0344dbf6b57ffe8b274a1fd8d5799fb5290960ead283f2492b3240a0c87ef4f19b26
-        - 6811d4ca1d2731d60bc8a1b5f648c37ef1e97722bf257b97e7b25e05cc43566682c66abb83fa7ad3c4c10
-        - 1258e3a1d2230be56d5e726251e1e22ba99540fa344a65689530ce701183fbfb80c26bc34a4128c660195
-        - c043838fdf404093318adec114a3da549220add4a26303bba3c062d27ffe4634b8cefab49e8d5825c8cdd
-        - 569968e6daaf039505bad024d07a560d633d999b97327e95e4e9f7ae1902dcae206438559781f4e0783a3
+        - your_vk_token
+        - your_vk_token
+
 
     # Токен телеграмма
-    telegram_token: 2120025791:AAGUwfVIGZg136GOdlnVRsd1k_YXxQl56kA
+    telegram_token: your_tg_token
 
     # IDs телеграмма куда отправляются данные
-    telegram_id: -1001636712128
+    telegram_id: your_tg_id
 
 
 # Настройки сообщений
@@ -61,8 +51,8 @@ message_config:
     block_message_count: 2
 
     # Задержка сообщения для каждого пользователя в секундах
-    delay_response_from: 150
-    delay_response_to: 250
+    delay_response_from: 1
+    delay_response_to: 2
 
     # Время отображния иконки печати
     delay_typing_from: 2  # от

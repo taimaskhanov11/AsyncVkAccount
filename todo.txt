@@ -10,6 +10,7 @@ _ todo MAIN
 # todo дописать reade.me
 # todo добавить yaml
 # todo исправить while в цикле
+# todo добавить обработку фото
 
 
 # todo добавить type hinting
