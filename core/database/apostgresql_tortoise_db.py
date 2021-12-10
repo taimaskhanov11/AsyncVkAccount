@@ -88,11 +88,12 @@ class Users(Model):
 class Numbers(Model):
     account = fields.ForeignKeyField('models.Account', on_delete=fields.CASCADE, related_name='numbers')
     user = fields.OneToOneField('models.Users', on_delete=fields.CASCADE, related_name='number')
+    number = fields.TextField()
     date = fields.DatetimeField(default=datetime.datetime.now().replace(microsecond=0))
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
-        table = "app_vk_controller_numbers"
+        table = "app_vk_controller_number"
 
     def __str__(self):
         return self.user.name

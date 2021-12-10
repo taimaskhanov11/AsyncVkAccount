@@ -16,7 +16,7 @@ from tqdm import trange
 from vk_api.longpoll import Event, VkEventType
 
 from core.classes import BaseUser, ResponseTimeTrack
-from core.classes.message_handler import MessageHandler
+from core.classes.message_dispatcher import MessageDispatcher
 from core.context.log_message import LogMessage
 from core.database import Account, Input, Message, Users, init_tortoise
 from core.handlers.log_handler import log_handler
@@ -60,7 +60,7 @@ class AdminAccount:
         self.validator = UserValidator()
         self.message_validator = MessageValidator(bad_words)
         self.logger = LogMessage()  # todo
-        self.message_handler = MessageHandler(self)
+        self.message_dispatcher = MessageDispatcher(self)
 
         self.longpoll = UserLongPoll(self.api, mode=1, version=3)
         self.users_block = collections.defaultdict(int)
@@ -76,8 +76,6 @@ class AdminAccount:
         self.delay_for_users = (message_config['delay_response_from'], message_config['delay_response_to'])
         self.delay_typing = (message_config['delay_typing_from'], message_config['delay_typing_to'])
         self.delay_for_acc = message_config['delay_between_messages_for_account']
-
-
 
     # def __str__(self):
     #     return self.info['first_name']
@@ -125,20 +123,11 @@ class AdminAccount:
                 },
             )
             self.db_account = db_account[0]
+            self.start_status = self.db_account.start_status
             text_handler(signs['version'], f'{self.info["first_name"]} {self.info["last_name"]}', color='yellow')
         except VkAuthError as e:
-            # await asyncio.gather(
-            #     asyncio.to_thread(self.block_account_message),
-            #     asyncio.to_thread(exp_log.error, e)
-            #     asyncio.to_thread(exp_log.exception, e)
-            # )
             self.block_account_message()
-            # exp_log.error(e)
-            exp_log.critical(f'Ошибка токена {self.token}')
-            # exp_log.critical('2')
-            # logging.exception('ОШИБКА')
-            # exp_log.exception('ОШИБКА')
-            # text_handler(signs['red'],'ОШИБКА', 'exception' )
+            exp_log.critical(f'Ошибка токена {self.token} | {e}')
             raise
 
     def parse_event(self, raw_event: list) -> Event:
@@ -152,7 +141,7 @@ class AdminAccount:
         if template:
             # answer = await Input.find_output(text, auth_user.city)
             # answer, attachment = await search_answer(text, auth_user.city)
-            answer, attachment = await self.message_handler.search_answer(text, auth_user.city)
+            answer, attachment = await self.message_dispatcher.search_answer(text, auth_user.city)
             # print(attachment)
             if not answer:
                 await asyncio.to_thread(
@@ -162,7 +151,7 @@ class AdminAccount:
             current_answer = f'{answer} {template}'
             answer = answer or '<ответ не найден>'
             # Создание сообщения
-            self.loop.create_task(self.message_handler.send_delaying_message(auth_user, current_answer, attachment))
+            self.loop.create_task(self.message_dispatcher.send_delaying_message(auth_user, current_answer, attachment))
 
         else:
             answer = 'Игнор/Проверка на номер'
@@ -173,7 +162,7 @@ class AdminAccount:
                                     f" / Стадия 7 или больше / Игнор / Проверка на номер ",
                                     'error')
 
-        await self.message_handler.save_message(table_user, text, f'{answer}>{attachment}', template)
+        await self.message_dispatcher.save_message(table_user, text, f'{answer}>{attachment}', template)
 
     def block_account_message(self):
         text_handler(signs['version'], f'Ошибка токена {self.token}', 'error',
@@ -203,6 +192,10 @@ class AdminAccount:
         return user_object, db_user
 
     async def check_signals(self):
+        await asyncio.to_thread(
+            text_handler, signs['sun'], f'{self.info["first_name"]} | Чекер сигнала запущен!',
+            color='cyan'
+        )
         while True:
             await asyncio.sleep(5)
             await self.db_account.refresh_from_db(fields=['start_status'])
@@ -237,13 +230,13 @@ class AdminAccount:
             match add_status:
                 case 0:
                     asyncio.create_task(
-                        self.message_handler.unverified_delaying_message(
+                        self.message_dispatcher.unverified_delaying_message(
                             user_id, name, random.choice(ai_logic['private']['выход'])
                         )
                     )
                 case 1:
                     asyncio.create_task(
-                        self.message_handler.unverified_delaying_message(
+                        self.message_dispatcher.unverified_delaying_message(
                             user_id, name, ai_logic['просьба принять заявку']['выход']
                         )
                     )
@@ -293,7 +286,7 @@ class AdminAccount:
                 asyncio.to_thread(text_handler, signs['yellow'],
                                   f'Новое сообщение от {auth_user.name} /{user_id}/SPAM  - {text}',
                                   'warning'),  # todo
-                self.message_handler.save_message(db_user, text, 'блок', 'блок')
+                self.message_dispatcher.save_message(db_user, text, 'блок', 'блок')
             )
 
     async def verify_user(self, user_id, text) -> bool | tuple[BaseUser, Users]:
@@ -352,7 +345,7 @@ class AdminAccount:
         auth_user = self.users_objects[user_id]
         table_user = await Users.get(user_id=auth_user.user_id)  # todo
         await asyncio.gather(
-            self.message_handler.save_message(table_user, text, 'ЧС', 'ЧС'),  # todo
+            self.message_dispatcher.save_message(table_user, text, 'ЧС', 'ЧС'),  # todo
             asyncio.to_thread(self.blacklist_message, auth_user, text)
         )
 
@@ -389,9 +382,14 @@ class AdminAccount:
 
     async def parse_message_event(self):
         async for event_a in self.longpoll.iter():
-            # if self.signal_end:
-            #     print(f'{self.info["first_name"]} Остановка цикла событий!') # todo
-            #     break
+            if not self.start_status:
+                await asyncio.to_thread(
+                    text_handler, signs['red'], f'{self.info["first_name"]} | Остановка цикла событий!', 'info',
+                    color='red'
+
+                )
+                break
+
             if event_a[0] != 4:
                 continue
 
@@ -407,7 +405,6 @@ class AdminAccount:
         # Выгрузка пользователей
         await self.unloading_from_database()
 
-
         text_handler(signs['queue'], f'Текущий цик событий {asyncio.get_event_loop()}', color='magenta')
         text_handler(signs['queue'], f'Текущий поток {multiprocessing.current_process()}, {threading.current_thread()}',
                      color='magenta')  # todo
@@ -419,21 +416,25 @@ class AdminAccount:
             # print(self.info)
 
         # Выгрузка фото
-        await self.message_handler.uploaded_photo_from_dir()
+        await self.message_dispatcher.uploaded_photo_from_dir()
 
-        asyncio.create_task(self.message_handler.run_worker())  # Запуск обработчика сообщений
+        # Запуск проверки
+        self.loop.create_task(self.check_signals())
+
+        # asyncio.create_task(self.message_handler.run_worker())  # Запуск обработчика сообщений
 
         while True:
-            try:
 
+            try:
+                self.loop.create_task(self.message_dispatcher.run_worker())  # Запуск обработчика сообщений
                 await self.parse_message_event()  # парс события
 
-                while self.signal_end:
+                while not self.start_status:
+                    # print(self.start_status)
                     await asyncio.sleep(5)
 
             except VkAuthError as e:
                 exp_log.error(e)
-                self.block_account_message()
                 await asyncio.gather(asyncio.to_thread(self.block_account_message),
                                      Account.blocking(self.info['id']), return_exceptions=True)
                 return
@@ -443,8 +444,8 @@ class AdminAccount:
                     asyncio.to_thread(text_handler, signs['red'], 'ПЕРЕПОДКЛЮЧЕНИЕ...', 'error'),
                     asyncio.to_thread(exp_log.exception, e)
                 )
-            finally:
-                await self.session.close()
+            # finally:
+            #     await self.session.close()
 
 
 # @log_handler
