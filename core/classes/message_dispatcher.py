@@ -15,11 +15,12 @@ from settings import signs, ai_logic
 BASE_DIR = Path(__file__).parent.parent.parent
 IMAGE_DIR = Path(BASE_DIR, 'config/image')
 
+
 # print(list(os.walk(IMAGE_DIR)))
 # print(Path(IMAGE_DIR, '2.jpg'))
 
 
-class MessageDispatcher(asyncio.Queue):
+class MessageHandler(asyncio.Queue):
     """
     Контролирует все процессы с полученными сообщениями
     """
@@ -27,6 +28,8 @@ class MessageDispatcher(asyncio.Queue):
     def __init__(self, overlord):  # todo
         super().__init__()
         self.overlord = overlord
+        self.log = self.overlord.log
+        self.delay = self.overlord.delay_for_acc
 
         self.http = requests.Session()
         self.http.headers.pop('user-agent')
@@ -43,18 +46,17 @@ class MessageDispatcher(asyncio.Queue):
                      'info', 'cyan')
 
     async def run_worker(self):
-        await asyncio.to_thread(
-            text_handler, signs['sun'], f'{self.overlord.info["first_name"]} | Обработчик сообщений запущен!',
-            color='blue'
-        )
+        self.log('run_worker_start', self.overlord.first_name)
+
         while True:
             # Вытаскиваем сообщение из очереди.
             user_id, name, text, attachment = await self.get()
-            # print(attachment)
+            attach_text = f'{text}>{attachment}'
             # Общее время между сообщениями, включает и время печатания
+
+            self.log('waiting_message', name, attach_text, self.delay)
             await asyncio.gather(
                 self.send_message(user_id, text, attachment),
-                asyncio.to_thread(self.waiting_message, name, f'{text}>{attachment}'),
                 asyncio.sleep(self.overlord.delay_for_acc)
             )
 
@@ -63,10 +65,10 @@ class MessageDispatcher(asyncio.Queue):
             # Проверка сигнала завершения
             if self.empty():
                 if not self.overlord.start_status:
-                    await asyncio.to_thread(text_handler, signs['red'], f'{self.overlord.info["first_name"]} | Завершение обработчика!', 'info', color='red')
+                    self.log('run_worker_end', self.overlord.first_name)
                     break
 
-    async def search_answer(self, text: str, city: str):  # todo
+    def search_answer(self, text: str, city: str):  # todo
         """
         Конвертирование разных по структуре но одинаковых
         по значению слов к общему по значению слову
@@ -121,10 +123,11 @@ class MessageDispatcher(asyncio.Queue):
                                               attachment=attachment,
                                               random_id=0)
 
-    async def unverified_delaying_message(self, user_id, name, text):  # todo name
+    async def unverified_delaying(self, user_id, name, text):  # todo name
         random_sleep_answer = random.randint(*self.overlord.delay_for_users)
         await asyncio.sleep(random_sleep_answer)
         await self.send_message(user_id, text)
+        self.log('message_send_success', name, text)
 
     async def send_delaying_message(self, auth_user: BaseUser, text: str, attachment: str) -> None:
         """Создание отложенного сообщения"""

@@ -6,8 +6,6 @@ from pathlib import Path
 from tortoise import Tortoise, fields, run_async
 from tortoise.models import Model
 
-from core.handlers.log_handler import log_handler
-
 BASE_DIR = Path(__file__)
 
 __all__ = [

@@ -13,6 +13,7 @@ accept_handling = settings['text_handler_controller']['accept_handling']  # todo
 class FunctionLogger:
 
     def __call__(self, *args, **kwargs):
+
         def error_logger(func):
             path = os.path.basename(inspect.getsourcefile(func))
 
@@ -42,10 +43,13 @@ class FunctionLogger:
                 # print(text_handler)
                 # print(path)
                 if accept_handling:
+                    # log('prog_log', f'{func_name:<36} {execute_time:<19} {"|async":<6}| {args} {kwargs} ')
+
                     await asyncio.to_thread(text_handler, signs['time'],
                                             f'{func_name:<36} {execute_time:<19} {"|async":<6}| {args} {kwargs} ',
                                             'debug',
                                             off_interface=True, talk=False, prop=True)
+
                     # text_handler(signs['time'],
                     #              f'{func_name:<36} {execute_time:<19} {"|async":<6}| {args} {kwargs} ',
                     #              'debug',
@@ -64,9 +68,12 @@ class FunctionLogger:
                 execute_time = f'{"Executed time"} {round(end, 5)}'
                 func_name = f'{path}/{func.__name__}'
                 if accept_handling:
+                    # log('prog_log', f'{func_name:<36} {execute_time:<19} {"|async":<6}| {args} {kwargs} ')
+
                     text_handler(signs['time'], f'{func_name:<36} {execute_time:<19} {"|sync":<6}| {args} {kwargs}',
                                  'debug',
                                  off_interface=True, talk=False, prop=True)
+
                 return res
 
             if inspect.iscoroutinefunction(func):

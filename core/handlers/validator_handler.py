@@ -8,7 +8,7 @@ import telebot
 
 from settings import signs, views
 
-from .log_handler import log_handler
+from .log_router import log_handler
 from .text_handler import text_handler
 
 
