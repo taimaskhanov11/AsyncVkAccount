@@ -1,8 +1,5 @@
 import time
 
-from core.handlers import text_handler
-from settings import signs
-
 
 class TimeTrack:
     def __init__(self, user_id: int, log):

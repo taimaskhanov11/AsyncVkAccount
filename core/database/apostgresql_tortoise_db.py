@@ -68,7 +68,6 @@ class Users(Model):
         for user in await cls.all():
             await user.delete_instance()
 
-
     @classmethod
     async def block_user(cls, user_id):
         table_user = await cls.get(user_id=user_id)
@@ -223,7 +222,9 @@ async def main():
 
 async def heroku_init():
     await Tortoise.init(
-        db_url='postgres://bcuoknoutrikhk:94fd296ff056160bf19a70efd4f9b855d4b8a0b50ad1902156735414563252de@ec2-63-34-223-144.eu-west-1.compute.amazonaws.com:5432/d9gvn77ajkr6cp',
+        db_url='postgres://bcuoknoutrikhk:94fd296ff056160bf19a70efd4f9b855'
+               'd4b8a0b50ad1902156735414563252de@ec2-63-34-223-144.eu-west-'
+               '1.compute.amazonaws.com:5432/d9gvn77ajkr6cp',
         modules={'models': ['__main__']}
     )
     await Tortoise.generate_schemas()

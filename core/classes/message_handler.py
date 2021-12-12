@@ -10,14 +10,10 @@ from core.classes import BaseUser
 from core.database import Message, Users
 from core.handlers import text_handler
 from core.log_settings import exp_log
-from settings import signs, ai_logic
+from settings import ai_logic, signs
 
 BASE_DIR = Path(__file__).parent.parent.parent
 IMAGE_DIR = Path(BASE_DIR, 'config/image')
-
-
-# print(list(os.walk(IMAGE_DIR)))
-# print(Path(IMAGE_DIR, '2.jpg'))
 
 
 class MessageHandler(asyncio.Queue):
@@ -36,24 +32,26 @@ class MessageHandler(asyncio.Queue):
 
         self.photos = {}
 
-
     async def run_worker(self):
         self.log('run_worker_start', self.overlord.first_name)
 
         while True:
+
             # Вытаскиваем сообщение из очереди.
             user_id, name, text, attachment = await self.get()
             attach_text = f'{text}>{attachment}'
-            # Общее время между сообщениями, включает и время печатания
 
             self.log('waiting_message', name, attach_text, self.delay)
+            # Общее время между сообщениями, включает и время печатания
             await asyncio.gather(
                 self.send_message(user_id, text, attachment),
-                asyncio.sleep(self.overlord.delay_for_acc)
+                asyncio.sleep(self.delay)
             )
-
             self.task_done()
-            self.overlord.users_objects[user_id].block_template = 0  # снятие блока после обработки
+
+            # снятие блока после обработки
+            self.overlord.users_objects[user_id].block_template = 0
+
             # Проверка сигнала завершения
             if self.empty():
                 if not self.overlord.start_status:
@@ -61,10 +59,7 @@ class MessageHandler(asyncio.Queue):
                     break
 
     def search_answer(self, text: str, city: str):  # todo
-        """
-        Конвертирование разных по структуре но одинаковых
-        по значению слов к общему по значению слову
-        """
+
         answer_end = ''
         attachments = ''
         try:
@@ -87,7 +82,7 @@ class MessageHandler(asyncio.Queue):
             return False
 
     async def uploaded_photo_from_dir(self) -> dict:
-        # dir_photos = [c for _, _, c in os.walk(IMAGE_DIR)]
+        """Выгрузка всех фото из config/image в базу в vk для текущего пользователя"""
         dir_photos = list(os.walk(IMAGE_DIR))[0][2]
         url_photos = await self.uploaded_photo(*dir_photos)
         photos_attachments = [f'photo{ph["owner_id"]}_{ph["id"]}' for ph in url_photos]
@@ -96,7 +91,7 @@ class MessageHandler(asyncio.Queue):
         text_handler(signs['version'], f'{self.overlord.info["first_name"]} | Фото выгружены', color='black')
         return res
 
-    async def uploaded_photo(self, *images):
+    async def uploaded_photo(self, *images: str):
         """Выгрузка своего фото на сервер"""
 
         photos = [str(Path(IMAGE_DIR, im)) for im in images]

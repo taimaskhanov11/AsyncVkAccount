@@ -4,26 +4,23 @@ import multiprocessing
 import random
 import threading
 import time
-from pprint import pprint
 
 from aiogram import Bot
 from aiovk import API, TokenSession
 from aiovk.exceptions import VkAuthError
 from aiovk.longpoll import UserLongPoll
-
 from colorama import init as colorama_init
 from tqdm import trange
 from vk_api.longpoll import Event, VkEventType
 
 from core.classes import BaseUser, TimeTrack
 from core.classes.message_handler import MessageHandler
+from core.database import Account, Users, init_tortoise
 from core.handlers.log_message import LogMessage
-from core.database import Account, Input, Message, Users, init_tortoise
-from core.handlers.log_router import log_handler
 from core.handlers.text_handler import text_handler
 from core.log_settings import exp_log
 from core.utils.find_most_city import find_most_city
-from core.validators import UserValidator, MessageValidator
+from core.validators import MessageValidator, UserValidator
 from settings import *
 
 colorama_init()
@@ -34,11 +31,15 @@ __all__ = [
     'upload_all_data_main',
 ]
 
-
 class AdminAccount:
     """Котролирует все процессы над аккаунтом"""
 
-    def __init__(self, vk_token: str, tg_token: str, tg_user_id: int, log_collector_queue):
+    def __init__(
+            self, vk_token: str,
+            tg_token: str,
+            tg_user_id: int,
+            log_collector_queue: multiprocessing.Queue
+    ) -> None:
         """
         :param vk_token: Токен аккаунта вк для создания сессии
         :param tg_token: Токен телеграмма для отправки номеров
@@ -49,6 +50,8 @@ class AdminAccount:
         # self.driver = HttpDriver(loop=loop) if loop else None
         self.session = TokenSession(self.token)
         self.api = API(self.session)
+        self.longpoll = UserLongPoll(self.api, mode=1, version=3)
+
         self.tg_bot = Bot(token=tg_token)
         self.tg_user_id = tg_user_id
 
@@ -56,6 +59,9 @@ class AdminAccount:
         self.delay_for_users = (message_config['delay_response_from'], message_config['delay_response_to'])
         self.delay_typing = (message_config['delay_typing_from'], message_config['delay_typing_to'])
         self.delay_for_acc = message_config['delay_between_messages_for_account']
+        self.state_answer_count = len(conversation_stages) + 4
+        self.friend_status_0 = ai_logic['private']['выход']
+        self.friend_status_1 = ai_logic['просьба принять заявку']['выход']
 
         self.users_objects = {}
         self.verified_users = []
@@ -64,11 +70,9 @@ class AdminAccount:
 
         self.validator = UserValidator()
         self.message_validator = MessageValidator(bad_words)
-        # self.logger = LogMessage()  # todo
-        self.log = LogMessage(self, log_collector_queue)  # todo
+        self.log = LogMessage(log_collector_queue)  # todo
         self.message_handler = MessageHandler(self)
 
-        self.longpoll = UserLongPoll(self.api, mode=1, version=3)
         self.users_block = collections.defaultdict(int)
         self.DEFAULT_EVENT_CLASS = Event
         self.info = None
@@ -78,14 +82,6 @@ class AdminAccount:
         self.db_account = None  # init in get_self_info
         self.signal_end = False
         self.start_status = True
-
-        self.friend_status_0 = ai_logic['private']['выход']
-        self.friend_status_1 = ai_logic['просьба принять заявку']['выход']
-
-        self.state_answer_count = len(conversation_stages) + 4
-
-    # def __str__(self):
-    #     return self.info['first_name']
 
     async def unloading_from_database(self):  # todo
         """Выгружает пользователей из базы в переменную"""
@@ -98,7 +94,7 @@ class AdminAccount:
             else:
                 self.verified_users.append(_id)
 
-    async def send_status_tg(self, text: str) -> None:
+    async def send_number_tg(self, text: str) -> None:
         """Отправка полученного номера в телеграмм по id"""
         await self.tg_bot.send_message(self.tg_user_id, text)
 
@@ -111,7 +107,7 @@ class AdminAccount:
     async def get_friend_info(self, user_id: int) -> dict:
         return await self.api.friends.search(user_id=user_id, fields="sex, city", count=1000)
 
-    async def get_self_info(self):
+    async def check_and_get_self_info(self):
         try:
             res = await self.api.users.get(fields=['photo_max_orig'])
             self.info = res[0]
@@ -128,16 +124,18 @@ class AdminAccount:
             self.db_account = db_account[0]
             self.start_status = self.db_account.start_status
             text_handler(signs['version'], f'{self.info["first_name"]} {self.info["last_name"]}', color='yellow')
+            return True
+
         except VkAuthError as e:
             self.block_account_message()
             exp_log.critical(f'Ошибка токена {self.token} | {e}')
-            raise
+            return False
 
     def parse_event(self, raw_event: list) -> Event:
         return self.DEFAULT_EVENT_CLASS(raw_event)
 
     def template_valid(self, auth_user, text, template):
-        # answer = await Input.find_output(text, auth_user.city)
+        # answer = await Input.find_output(text, auth_user.city) #todo поиск через Таблицу
         # answer, attachment = await search_answer(text, auth_user.city)
         answer, attachment = self.message_handler.search_answer(text, auth_user.city)
         # print(attachment)
@@ -155,9 +153,10 @@ class AdminAccount:
         self.log('template_invalid', user_id, name)
         return answer, attachment, template
 
-    async def create_answer(self, text: str, auth_user: BaseUser, table_user: Users) -> None:
+    async def create_answer(self, text: str,
+                            auth_user: BaseUser,
+                            table_user: Users) -> None:
         """Формирование ответа пользователю"""
-        # print(text)
         template = await auth_user.act(text)  # todo
 
         if template:
@@ -177,8 +176,9 @@ class AdminAccount:
                            last_name: str,
                            mode: bool = True, city: str = 'None',
                            photo_url: str = 'Нет фото') -> tuple[BaseUser, Users]:  # todo убрать
+
         """Создание объекта пользователя и сохранение в бд"""
-        # pprint([user_id, first_name, last_name, mode, city, photo_url])
+
         db_user = await Users.create(
             account=self.db_account,
             user_id=user_id,
@@ -252,27 +252,20 @@ class AdminAccount:
             await self.add_to_blacklist(user_id)
             self.log('bad_word', auth_user.name, user_id)
 
-        # Проверка на стадию разговора, если больше в черный список
+        # Проверка на стадию разговора, если больше - в черный список
         elif auth_user.state > self.state_answer_count:
             await self.add_to_blacklist(user_id)
             self.log('blacklist_message', auth_user.name, text)
 
-        # Проверка на частоту сообщений если меньше self.block_message_count, отвечаем
+        # Проверка на частоту сообщений если меньше self.block_message_count - отвечает
         elif auth_user.block_template < self.block_message_count:
             self.log('auth_user_message', auth_user.name, user_id, text)
             await self.create_answer(text, auth_user, db_user)  # Создание ответа
 
         else:
-            # Проверка на частоту сообщений если больше self.block_message_count, игнорим
+            # Проверка на частоту сообщений если больше self.block_message_count - игнорит
             await self.message_handler.save_message(db_user, text, 'блок', 'блок')
             self.log('spam_message', auth_user.name, user_id, text)
-
-    def find_most_city(self, friend_list: dict) -> str:
-        friends_city = [i['city']['title'] for i in friend_list['items'] if
-                        i.get('city')]
-        c_friends_city = collections.Counter(friends_city)
-        city = max(c_friends_city.items(), key=lambda x: x[1])[0]
-        return city
 
     async def user_is_valid(self, city, user_id, first_name, last_name, photo_url):
         auth_user, table_user = await self.update_users(user_id, first_name, last_name, city=city,
@@ -285,7 +278,7 @@ class AdminAccount:
         self.log('verification_failed', user_id, first_name)
         return False
 
-    async def verify_user(self, user_id, text) -> bool | tuple[BaseUser, Users]:
+    async def verify_user(self, user_id: int, text: str) -> bool | tuple[BaseUser, Users]:
         """Валидация и создание пользователя"""
         user_info = await self.get_user_info(user_id)
         first_name = user_info['first_name']
@@ -336,16 +329,18 @@ class AdminAccount:
         text = event.text.lower()
         user_id = event.user_id
 
-        if user_id in self.verifying_users:  # Ожидаем завершения проверки
+        # Ожидаем завершения проверки
+        if user_id in self.verifying_users:
             await self.wait_for_verification(user_id, 2)
 
-        res_time_track = TimeTrack(user_id, self.log)
+        res_time_track = TimeTrack(user_id, self.log)  # todo
 
         if user_id in self.unverified_users:
             await self.for_unverified_users(user_id, text)
 
         elif user_id in self.verified_users:
-            await self.create_response(user_id, text)  # Создание ответа
+            # Создание ответа
+            await self.create_response(user_id, text)
             res_time_track.stop()
 
         else:
@@ -365,7 +360,8 @@ class AdminAccount:
             event = self.DEFAULT_EVENT_CLASS(event_a)
             # print(event)
             if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text and event.from_user:
-                self.loop.create_task(self.event_analysis(event))  # Создания задачи Анализ события
+                # Создания задачи Анализ события
+                self.loop.create_task(self.event_analysis(event))
 
     async def run_session(self):
         """Запуст и выгрузка основных данных"""
@@ -373,16 +369,14 @@ class AdminAccount:
         # Инициализация базы данных
         await init_tortoise(*db_config.values())
 
+        if not await self.check_and_get_self_info():
+            return False
+
         # Выгрузка пользователей
         await self.unloading_from_database()
 
-        try:
-            await self.get_self_info()
-        except:
-            return
-            # print(self.info)
-
         self.log('process_info',
+                 self.first_name,
                  str(self.loop),
                  str(multiprocessing.current_process()),
                  str(threading.current_thread()))
@@ -392,16 +386,16 @@ class AdminAccount:
 
         # Запуск проверки сигнала запуска
         self.loop.create_task(self.signal_checking())
-        # self.log.queue.put(self.first_name)
 
         while True:
-
             try:
-                self.loop.create_task(self.message_handler.run_worker())  # Запуск обработчика сообщений
-                await self.parse_message_event()  # парс события
+                # Запуск обработчика сообщений
+                self.loop.create_task(self.message_handler.run_worker())
+
+                # парс события
+                await self.parse_message_event()
 
                 while not self.start_status:
-                    # print(self.start_status)
                     await asyncio.sleep(5)
 
             except VkAuthError as e:
@@ -417,9 +411,8 @@ class AdminAccount:
 
 # @log_handler
 def upload_all_data_main(statusbar=False):
-    """Инициализация данных профиля и сохранений в базе"""
+    """Инициализация данных профиля"""
     try:
-
         text_handler(f"VkBot v{bot_version}", '', color='blue')
         text_handler(signs['magenta'], f'Загруженно токенов {len(vk_tokens)}: ', color='magenta')
         for a, b in enumerate(vk_tokens, 1):
@@ -439,7 +432,7 @@ def upload_all_data_main(statusbar=False):
         time.sleep(1)
 
         if statusbar:
-            for i in trange(300, colour='green', smoothing=0.1, unit_scale=True):
+            for _ in trange(300, colour='green', smoothing=0.1, unit_scale=True):
                 time.sleep(0.001)
         # if is_bad_proxy(proxy):
         #     await TextHandler(SIGNS['magenta'], f"    BAD PROXY {proxy}", log_type='error', full=True)

@@ -1,12 +1,12 @@
-from pathlib import Path
-
 import json
 import os
-
-# from polog import config, file_writer
+from pathlib import Path
 
 import yaml
 from aiovk import TokenSession
+
+# from polog import config, file_writer
+
 
 __all__ = [
     'settings',
@@ -19,6 +19,7 @@ __all__ = [
     'message_config',
     'db_config',
     'bad_words',
+    'log_colors',
 
     'vk_tokens',
     'tg_token',
@@ -68,7 +69,7 @@ text_settings = settings['text_handler_controller']
 token_config = settings['token_config']
 message_config = settings['message_config']
 db_config = settings['db_config']
-# pprint(ai_logic)
+
 try:
     tg_token = os.getenv('tg_token') or token_config['telegram_token']
     tg_id = int(os.getenv('tg_id') or token_config['telegram_id'])
@@ -77,9 +78,6 @@ try:
 except Exception as e:
     exp_log.exception(e)
     print('Неправильный ввод ВК или ТГ токена')
-
-# print(type(vk_tokens))
-# print(vk_tokens)
 
 signs = {
     "red": "✖",

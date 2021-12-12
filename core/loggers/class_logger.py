@@ -8,7 +8,7 @@ class ClassLogger:
     def __call__(self, *args, methods=(), message=None, level=1, errors_level=None, **kwargs):
 
         log_collector = kwargs.get('log_collector')
-        exclude = kwargs.get('exclude')
+        exclude = kwargs.get('exclude') #todo
         include = kwargs.get('include')
 
         def decorator(Class):
@@ -31,7 +31,7 @@ class ClassLogger:
                     # print(method_name)
                     new_method = flog(method,
                                       log_collector=log_collector,
-                                      include = include)
+                                      include=include)
                     setattr(Class, method_name, new_method)
             return Class
 

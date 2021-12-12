@@ -1,13 +1,9 @@
 import asyncio
-import datetime
 import random
 import re
 
-import pandas as pd
-
 from core.database import Numbers, Users
-from core.handlers import text_handler
-from settings import conversation_stages, signs
+from settings import conversation_stages
 
 
 class TransparentUser:
@@ -19,6 +15,7 @@ class TransparentUser:
 class BaseUser:
     def __init__(self, user_id: int, db_user: Users, overlord, state: int, name: str, city: str):
         self.overlord = overlord
+        self.log = self.overlord.log
         self.db_user = db_user
         self.user_id = user_id
         self.state = state
@@ -37,32 +34,23 @@ class BaseUser:
         self.state += 1
         await Users.add_state(self.user_id)
 
+    async def send_number(self, text: str) -> None:
+        self.overlord.send_number_tg(
+            f'бот {self.overlord.info["first_name"]} {self.overlord.info["last_name"]}\n'
+            f"Полученные данные:\n"
+            f"name      {self.name}\n"
+            f"id        {self.user_id}\n"
+            f"url       https://vk.com/id{self.user_id}\n"
+            f"number    {text}"
+        ),
+
     async def number_success(self, text):
+        self.log('number_success', self.user_id, self.name, text)
         await asyncio.gather(
             Numbers.create(account=self.overlord.db_account,
                            user=self.db_user, number=text),
             Users.change_value(self.user_id, "blocked", True),
-            asyncio.to_thread(
-                text_handler,
-                signs["number"],
-                f"{self.user_id} / {self.name} Номер получен добавление в unverified_users",
-                'warning'
-            ),
-            asyncio.to_thread(
-                text_handler,
-                signs["tg"],
-                f"Отправка данных пользователя {self.name} в telegram",
-                "warning",
-                color="blue",
-            ),
-            self.overlord.send_status_tg(
-                f'бот {self.overlord.info["first_name"]} {self.overlord.info["last_name"]}\n'
-                f"Полученные данные:\n"
-                f"name      {self.name}\n"
-                f"id        {self.user_id}\n"
-                f"url       https://vk.com/id{self.user_id}\n"
-                f"number    {text}"
-            ),
+            self.send_number(text)
         )
         self.overlord.unverified_users.append(self.user_id)  # todo
 
@@ -74,7 +62,6 @@ class BaseUser:
                 await self.number_success(text)
                 return False
 
-            # print(self.len_template)
             if self.state >= self.len_template + 1:
                 return False
             res = random.choice(conversation_stages[f"state{self.state}"])

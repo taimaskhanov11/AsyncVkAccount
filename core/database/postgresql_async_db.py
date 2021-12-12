@@ -60,7 +60,7 @@ class Numbers(BaseModel):
     @classmethod
     @async_time_track
     async def create_user(cls, user_id, name, city, number):
-        user, created = cls.get_or_create(user_id=user_id, name=name, city=city, number=number)
+        _, _ = cls.get_or_create(user_id=user_id, name=name, city=city, number=number)
 
 
 class Users(BaseModel):

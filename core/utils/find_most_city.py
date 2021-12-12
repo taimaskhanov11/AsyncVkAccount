@@ -1,8 +1,5 @@
 from collections import Counter
 
-# from core.loggers.function_logger import flog
-
-
 
 def find_most_city(friend_list: dict) -> str:
     friends_city = [i['city']['title'] for i in friend_list['items'] if

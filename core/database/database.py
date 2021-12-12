@@ -90,7 +90,6 @@ class Users(BaseModel):
     # async def get(cls, **kwargs):
     #     return super(Users, cls).get( **kwargs)
 
-
     @classmethod
     @async_time_track
     async def get_user(cls, user_id):

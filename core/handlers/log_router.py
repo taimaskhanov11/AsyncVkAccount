@@ -1,6 +1,7 @@
 import inspect
 import sys
 
+from core.handlers.log_message import LogMessage
 from core.loggers.class_logger import clog, flog
 from settings import settings
 
@@ -39,23 +40,22 @@ class Router:
         raise ValueError('You used the logging decorator incorrectly. Read the documentation.')
         # return decorator
 
-    def init_module_logging(self, module):
+    @staticmethod
+    def init_module_logging(module):
         current_module = sys.modules[module]
         for v_name in dir(current_module):
             v = getattr(current_module, v_name)
             setattr(current_module, v_name, log_handler(v))
 
-    def init_choice_logging(self, module, *obj, **kwargs):
-        log_collector = kwargs.get('log_collector')
-        # print(log_collector)
-
+    @staticmethod
+    def init_choice_logging(module: str,
+                            *obj,
+                            log_collector: LogMessage,
+                            **kwargs):
         current_module = sys.modules[module]
-        # print(current_module)
         for v_name in dir(current_module):
             if v_name in obj:
                 v = getattr(current_module, v_name)
-                print(v)
-                print(current_module)
                 setattr(current_module, v_name, log_handler(v, log_collector=log_collector))
 
 

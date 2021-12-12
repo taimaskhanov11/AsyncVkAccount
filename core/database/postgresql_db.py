@@ -18,7 +18,6 @@ def time_track1(func):
     def surrogate(*args, **kwargs):
         started_at = time.time()
         result = func(*args, **kwargs)
-
         ended_at = time.time()
         # elapsed = round(ended_at - started_at, 5)
         elapsed = ended_at - started_at

@@ -1,7 +1,4 @@
-import asyncio
 import multiprocessing
-import threading
-import time
 
 from core.handlers import text_handler
 from core.log_settings import exp_log, not_answer_log
@@ -10,11 +7,8 @@ from settings import signs
 
 class LogMessage:
 
-    def __init__(self, overlord, log_collector_queue: multiprocessing.Queue):
-        # self.overlord = overlord
+    def __init__(self, log_collector_queue: multiprocessing.Queue):
         self.queue = log_collector_queue
-
-    # def run(self, queue: multiprocessing.Queue):
 
     def __call__(self, func_name, *args):
         self.queue.put((func_name, args))
@@ -33,7 +27,11 @@ class LogMessage:
         text_handler(signs['time'],
                      text,
                      'debug',
-                     off_interface=True, talk=False, prop=True)
+                     talk=False, prop=True)
+
+    @staticmethod
+    def exp_log_error(e):
+        exp_log.error(e)
 
     @staticmethod
     def blacklist_message(name, text):
@@ -59,10 +57,10 @@ class LogMessage:
                      color='red')
 
     @staticmethod
-    def process_info(loop_name, process_name, thread_name):
-        text_handler(signs['queue'], f'Текущий цик событий {loop_name}', color='magenta')
-        text_handler(signs['queue'], f'Текущий поток {process_name}, {thread_name}',
-                     color='magenta')  # todo
+    def process_info(name, loop_name, process_name, thread_name):
+        text_handler(signs['queue'], f'{name}\n'
+                                     f'Текущий цик событий {loop_name}\n'
+                                     f'Текущий поток {process_name}, {thread_name}', color='magenta')
 
     @staticmethod
     def new_user_message(first_name, user_id, text):
@@ -136,13 +134,29 @@ class LogMessage:
     @staticmethod
     def time_track_stop(text):
         text_handler(signs['time'], text, 'debug', color='blue',
-                     off_interface=True, prop=True)
+                     prop=True)
 
     @staticmethod
     def no_answer_found(user_id, name, text):
         not_answer_log.warning(f'{user_id} {name} --> {text}')
 
-    """MessageHandler functions"""
+    """************************* Base functions ****************"""
+
+    @staticmethod
+    def number_success(user_id: int, name: str, text: str):
+        text_handler(
+            signs["number"],
+            f"{user_id} / {name} Номер получен {text}| Добавление в unverified_users",
+            'warning'
+        )
+        text_handler(
+            signs["tg"],
+            f"Отправка данных пользователя {name} в telegram",
+            "warning",
+            color="blue",
+        ),
+
+    """************************* MessageHandler functions ****************"""
 
     @staticmethod
     def run_worker_start(first_name):
@@ -161,7 +175,7 @@ class LogMessage:
                      f'Сообщение пользователю {name} c тексом: `{text}...` ⇑Отправлено',
                      'info', 'blue')
         text_handler(signs['queue'],
-                     f'Ожидание очереди. Тайминг {delay_for_acc} s\n',
+                     f'Ожидание очереди. Тайминг {delay_for_acc} s',
                      'info', 'cyan')
 
     @staticmethod
@@ -179,4 +193,3 @@ class LogMessage:
     @staticmethod
     def validator_failure(text):
         text_handler(signs['red'], text, 'error')
-

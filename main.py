@@ -1,50 +1,32 @@
 import asyncio
 import multiprocessing
-import sys
 from multiprocessing import Process
 
-from core.database import Users, init_tortoise
-from core.utils import find_most_city
 import vk_bot
+from core import validators
 from core.classes import message_handler
-from core.handlers import validator_handler
-from core.handlers.log_message import LogMessage
+from core.database import Users, init_tortoise
+from core.handlers import LogMessage, validator_handler
 from core.handlers.log_router import log_handler
-from core import validators, utils
 from core.loggers.function_logger import flog
-
-from settings import tg_id, tg_token, vk_tokens, db_config
+from settings import db_config, tg_id, tg_token, vk_tokens
 from vk_bot import AdminAccount, upload_all_data_main
-import core
 
 
-def split_list(a_list):
-    half = len(a_list) // 2
-    return a_list[:half], a_list[half:]
-
-
-async def main(token, log_collector):
+async def start(token, log_collector):
     vk = AdminAccount(token, tg_token, tg_id, log_collector)
     await vk.run_session()
 
 
-def start(token, log_collector):
-    log_message = LogMessage(None, log_collector)
+def main(token, log_collector):
+    log_message = LogMessage(log_collector)
     init_logging_main(log_message)
-
     loop = asyncio.new_event_loop()
-    # loop = asyncio.get_event_loop()
-    # asyncio.set_event_loop(loop)
-    loop.run_until_complete(main(token, log_collector))
-    # loop = asyncio.get_event_loop()
-    # print(loop)
-    # asyncio.new_event_loop()
+    loop.run_until_complete(start(token, log_collector))
     # asyncio.run(main(token))
 
 
-# print('AAAA')
-
-def init_logging_main(log_collector):
+def init_logging_main(log_collector: LogMessage) -> None:
     log_handler.init_choice_logging(
         'vk_bot',
         *vk_bot.__all__,
@@ -71,23 +53,26 @@ def multi_main():
     # Thread(target=skd, daemon=True).start()
     upload_all_data_main(statusbar=False)
     log_collector = multiprocessing.Queue()
-    log_message = LogMessage(None, log_collector)
-
+    log_message = LogMessage(log_collector)
     # log_collector = {}
-    # log_process = multiprocessing.Process(target=lp.run)
-    # log_process.start()
-    if len(vk_tokens) > 1:
-        processes = [Process(target=start, args=(token, log_collector), daemon=True) for token in vk_tokens]
-        [pr.start() for pr in processes]
-    else:
-        print("Один токен")
-        start(vk_tokens[0], log_collector)
 
-    try:
+    # processes = [Process(target=main, args=(token, log_collector), daemon=True) for token in vk_tokens]
+    # [pr.start() for pr in processes]
+    if len(vk_tokens) > 1:
+        processes = [Process(target=main, args=(token, log_collector), daemon=True) for token in vk_tokens]
+        [pr.start() for pr in processes]
         log_message.run()
-    finally:
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(delete_all())
+    else:
+        log_process = multiprocessing.Process(target=log_message.run)
+        log_process.start()
+        print("Один токен")
+        main(vk_tokens[0], log_collector)
+
+    # try:
+    # log_message.run()
+    # finally:
+    #     loop = asyncio.new_event_loop()
+    #     loop.run_until_complete(delete_all())
 
 
 async def delete_all():
@@ -99,7 +84,3 @@ if __name__ == "__main__":
     # asyncio.run(main())
     multiprocessing.freeze_support()
     multi_main()
-    # start()
-    # main()
-    # Thread(target=scr).start()  # todo #ph
-    # Thread(target=send_keyboard).start()  # todo #key

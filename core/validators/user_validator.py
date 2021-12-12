@@ -1,7 +1,6 @@
 import asyncio
 
-from core.handlers import text_handler, validator_handler
-from core.log_settings import exp_log
+from core.handlers import text_handler
 from settings import signs
 
 
@@ -82,6 +81,5 @@ class UserValidator:
             return False
         else:
             return True
-
 
 # Validator = validator_handler(UserValidator)

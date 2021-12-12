@@ -1,8 +1,3 @@
-from core.classes import BaseUser
-from core.handlers import text_handler
-from settings import signs
-
-
 class MessageValidator:
 
     def __init__(self, bad_words: list[str]):

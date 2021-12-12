@@ -8,19 +8,19 @@ import telebot
 
 from settings import signs, views
 
+from .log_message import LogMessage
 from .log_router import log_handler
 from .text_handler import text_handler
 
 
 class ValidatorHandler:
 
-    def __call__(self, *args, **kwargs):
-        # print(args)
-        log_collector = kwargs.get('log_collector')
-        exclude = kwargs.get('exclude')
-        # print(log_collector)
-        def decorator(Class):
+    def __call__(self, *args,
+                 log_collector: LogMessage,
+                 **kwargs):
+        exclude: list = kwargs.get('exclude')
 
+        def decorator(Class):
             def func_decor(func):
                 validator = views['validators'][func.__name__]
 
