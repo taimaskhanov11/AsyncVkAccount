@@ -6,6 +6,7 @@ import yaml
 from aiovk import TokenSession
 
 # from polog import config, file_writer
+# config.add_handlers(file_writer(str(Path(BASE_DIR, 'logs/new_log.log'))))
 
 
 __all__ = [
@@ -35,7 +36,6 @@ from core.log_settings import exp_log
 BASE_DIR = Path(__file__).parent
 
 
-# config.add_handlers(file_writer(str(Path(BASE_DIR, 'logs/new_log.log'))))
 
 
 def read_json(path, encoding='utf-8-sig'):
