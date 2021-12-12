@@ -36,14 +36,6 @@ class MessageHandler(asyncio.Queue):
 
         self.photos = {}
 
-    def waiting_message(self, name, text):
-        text_handler(signs['message'],
-                     f'Сообщение пользователю {name} c тексом: `{text[:40]}...` ⇑Отправлено',
-                     'info', 'blue')
-
-        text_handler(signs['queue'],
-                     f'Ожидание очереди. Тайминг {self.overlord.delay_for_acc} s\n',
-                     'info', 'cyan')
 
     async def run_worker(self):
         self.log('run_worker_start', self.overlord.first_name)

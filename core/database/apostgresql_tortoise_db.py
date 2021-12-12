@@ -64,6 +64,12 @@ class Users(Model):
         await self.delete()
 
     @classmethod
+    async def delete_all(cls):
+        for user in await cls.all():
+            await user.delete_instance()
+
+
+    @classmethod
     async def block_user(cls, user_id):
         table_user = await cls.get(user_id=user_id)
         table_user.blocked = True

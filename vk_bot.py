@@ -16,13 +16,13 @@ from tqdm import trange
 from vk_api.longpoll import Event, VkEventType
 
 from core.classes import BaseUser, TimeTrack
-from core.classes.message_dispatcher import MessageHandler
+from core.classes.message_handler import MessageHandler
 from core.handlers.log_message import LogMessage
 from core.database import Account, Input, Message, Users, init_tortoise
 from core.handlers.log_router import log_handler
 from core.handlers.text_handler import text_handler
 from core.log_settings import exp_log
-from core.utils import find_most_city
+from core.utils.find_most_city import find_most_city
 from core.validators import UserValidator, MessageValidator
 from settings import *
 
@@ -83,8 +83,6 @@ class AdminAccount:
         self.friend_status_1 = ai_logic['просьба принять заявку']['выход']
 
         self.state_answer_count = len(conversation_stages) + 4
-
-
 
     # def __str__(self):
     #     return self.info['first_name']
@@ -239,11 +237,6 @@ class AdminAccount:
 
         return True
 
-    def blacklist_message(self, auth_user: BaseUser, text: str) -> None:
-        text_handler(signs['red'],
-                     f'Новое сообщение от {auth_user.name}/Черный список/: {text}',
-                     'error')
-
     async def add_to_blacklist(self, user_id: int):
         self.unverified_users.append(user_id)
         await Users.block_user(user_id)
@@ -266,16 +259,22 @@ class AdminAccount:
 
         # Проверка на частоту сообщений если меньше self.block_message_count, отвечаем
         elif auth_user.block_template < self.block_message_count:
-            await self.create_answer(text, auth_user, db_user)  # Создание ответа
             self.log('auth_user_message', auth_user.name, user_id, text)
+            await self.create_answer(text, auth_user, db_user)  # Создание ответа
 
         else:
             # Проверка на частоту сообщений если больше self.block_message_count, игнорим
             await self.message_handler.save_message(db_user, text, 'блок', 'блок')
             self.log('spam_message', auth_user.name, user_id, text)
 
-    async def user_is_valid(self, friend_list, user_id, first_name, last_name, photo_url):
-        city = find_most_city(friend_list)
+    def find_most_city(self, friend_list: dict) -> str:
+        friends_city = [i['city']['title'] for i in friend_list['items'] if
+                        i.get('city')]
+        c_friends_city = collections.Counter(friends_city)
+        city = max(c_friends_city.items(), key=lambda x: x[1])[0]
+        return city
+
+    async def user_is_valid(self, city, user_id, first_name, last_name, photo_url):
         auth_user, table_user = await self.update_users(user_id, first_name, last_name, city=city,
                                                         photo_url=photo_url)
         self.log('verification_successful', user_id, first_name)
@@ -306,7 +305,8 @@ class AdminAccount:
         )
 
         if valid:
-            return await self.user_is_valid(friend_list, user_id, first_name, last_name, photo_url)
+            city = find_most_city(friend_list)  # todo
+            return await self.user_is_valid(city, user_id, first_name, last_name, photo_url)
         else:
             return await self.user_is_invalid(user_id, first_name, last_name, photo_url)
 
@@ -448,6 +448,5 @@ def upload_all_data_main(statusbar=False):
     except Exception as e:
         exp_log.exception(e)
 
-
-log_handler.init_choice_logging(__name__,
-                                *__all__)
+# log_handler.init_choice_logging(__name__,
+#                                 *__all__)

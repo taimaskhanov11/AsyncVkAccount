@@ -12,6 +12,8 @@ _ todo MAIN
 # todo исправить while в цикле
 # todo оптимзировать ввод выдод
 # todo добавить все логи в отдельный процесс
+# todo update_logger
+
 
 
 

@@ -16,7 +16,9 @@ class ValidatorHandler:
 
     def __call__(self, *args, **kwargs):
         # print(args)
-
+        log_collector = kwargs.get('log_collector')
+        exclude = kwargs.get('exclude')
+        # print(log_collector)
         def decorator(Class):
 
             def func_decor(func):
@@ -25,11 +27,14 @@ class ValidatorHandler:
                 @functools.wraps(func)
                 def wrapper(*args, **kwargs):
                     text_handler(signs['yellow'], validator['check'], 'warning')
+
                     res = func(*args, **kwargs)
                     if res:
-                        text_handler(signs['yellow'], validator['success'])
+                        log_collector('validator_success', validator['success'])
+                        # text_handler(signs['yellow'], validator['success'])
                     else:
-                        text_handler(signs['red'], validator['failure'], 'error')
+                        log_collector('validator_failure', validator['failure'])
+                        # text_handler(signs['red'], validator['failure'], 'error')
                     return res
 
                 return wrapper
@@ -42,12 +47,15 @@ class ValidatorHandler:
                 method = getattr(Class, method_name)
                 # print(method)
                 if inspect.isfunction(method):
-                    # print(method_name)
+
+                    if method_name in exclude:
+                        continue
+
                     if method_name in ['photo_validator', 'age_validator',
                                        'mens_validator', 'count_friends_validator']:
-                        new_method = log_handler(func_decor(method))  # todo
+                        new_method = log_handler(func_decor(method), log_collector=log_collector)  # todo
                     else:
-                        new_method = log_handler(method)
+                        new_method = log_handler(method, log_collector=log_collector)
                     setattr(Class, method_name, new_method)
             return Class
 

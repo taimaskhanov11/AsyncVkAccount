@@ -1,6 +1,7 @@
 from collections import Counter
 
-from core.loggers.function_logger import flog
+# from core.loggers.function_logger import flog
+
 
 
 def find_most_city(friend_list: dict) -> str:
@@ -10,4 +11,4 @@ def find_most_city(friend_list: dict) -> str:
     city = max(c_friends_city.items(), key=lambda x: x[1])[0]
     return city
 
-find_most_city = flog(find_most_city)
+# find_most_city = flog(find_most_city)

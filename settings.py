@@ -1,11 +1,9 @@
-import os
 from pathlib import Path
 
 import json
 import os
 
 # from polog import config, file_writer
-from pprint import pprint
 
 import yaml
 from aiovk import TokenSession
@@ -26,6 +24,9 @@ __all__ = [
     'tg_token',
     'tg_id',
     'views',
+
+    # 'LOG_COLLECTOR',
+    # 'log'
 ]
 
 from core.log_settings import exp_log
@@ -45,6 +46,10 @@ def read_yaml(path):
     # print(path)
     with open(Path(BASE_DIR, path), 'r', encoding='utf-8-sig') as fh:
         return yaml.safe_load(fh)
+
+
+# LOG_COLLECTOR = multiprocessing.Queue()
+# log = LogHandler(None, LOG_COLLECTOR)
 
 
 TokenSession.API_VERSION = '5.131'

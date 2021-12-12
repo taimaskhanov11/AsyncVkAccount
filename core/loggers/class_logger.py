@@ -5,7 +5,11 @@ from core.loggers.function_logger import flog
 
 class ClassLogger:
 
-    def __call__(self, *args, methods=(), message=None, level=1, errors_level=None):
+    def __call__(self, *args, methods=(), message=None, level=1, errors_level=None, **kwargs):
+
+        log_collector = kwargs.get('log_collector')
+        exclude = kwargs.get('exclude')
+        include = kwargs.get('include')
 
         def decorator(Class):
             # Получаем имена методов класса.
@@ -19,8 +23,15 @@ class ClassLogger:
                 method = getattr(Class, method_name)
                 # print(method)
                 if inspect.isfunction(method):
+
+                    if include:
+                        if method_name not in include:
+                            continue
+
                     # print(method_name)
-                    new_method = flog(method)
+                    new_method = flog(method,
+                                      log_collector=log_collector,
+                                      include = include)
                     setattr(Class, method_name, new_method)
             return Class
 

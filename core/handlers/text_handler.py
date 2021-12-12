@@ -33,6 +33,6 @@ def text_handler(sign: str,
         p_sign = colored(sign, f'bright {color}')
         if prop:
             if text_settings['accept_print_property']:
-                print(f'{p_sign} {text}')
+                print(f'{p_sign} {text[:120]}')
         else:
-            print(f'{p_sign} {text}')
+            print(f'{p_sign} {text[:120]}')
