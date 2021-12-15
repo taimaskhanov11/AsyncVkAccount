@@ -1,12 +1,14 @@
 import asyncio
 import multiprocessing
+import threading
 from multiprocessing import Process
 
 import vk_bot
 from core import validators
 from core.classes import message_handler
 from core.database import Users, init_tortoise
-from core.handlers import LogMessage, validator_handler
+from core.handlers.log_message import LogMessage
+from core.handlers.validator_handler import validator_handler
 from core.handlers.log_router import log_handler
 from core.loggers.function_logger import flog
 from settings import db_config, tg_id, tg_token, vk_tokens
@@ -48,31 +50,43 @@ def init_logging_main(log_collector: LogMessage) -> None:
                                                      'save_message'])
 
 
-def multi_main():
-    # Thread(target=scr, daemon=True).start()
-    # Thread(target=skd, daemon=True).start()
-    upload_all_data_main(statusbar=False)
-    log_collector = multiprocessing.Queue()
-    log_message = LogMessage(log_collector)
-    # log_collector = {}
+def run_queue_on_thread(log_message, log_collector):
+    if len(vk_tokens) > 1:
+        processes = [Process(target=main, args=(token, log_collector), daemon=True) for token in vk_tokens]
+        [pr.start() for pr in processes]
+        threading.Thread(target=log_message.run).start()
+    else:
+        threading.Thread(target=log_message.run).start()
+        print("Один токен")
+        main(vk_tokens[0], log_collector)
 
-    # processes = [Process(target=main, args=(token, log_collector), daemon=True) for token in vk_tokens]
-    # [pr.start() for pr in processes]
+
+def run_queue_on_process(log_message, log_collector):
     if len(vk_tokens) > 1:
         processes = [Process(target=main, args=(token, log_collector), daemon=True) for token in vk_tokens]
         [pr.start() for pr in processes]
         log_message.run()
     else:
-        log_process = multiprocessing.Process(target=log_message.run)
+        log_process = multiprocessing.Process(target=log_message.run) #todo
         log_process.start()
         print("Один токен")
         main(vk_tokens[0], log_collector)
 
-    # try:
-    # log_message.run()
-    # finally:
-    #     loop = asyncio.new_event_loop()
-    #     loop.run_until_complete(delete_all())
+
+def multi_main():
+    # Thread(target=scr, daemon=True).start()
+    # Thread(target=skd, daemon=True).start()
+    try:
+        upload_all_data_main(statusbar=False)
+        log_collector = multiprocessing.Queue()
+        # log_collector = Queue()
+        log_message = LogMessage(log_collector)
+        # run_queue_on_thread(log_message, log_collector)
+        run_queue_on_process(log_message, log_collector)
+
+    finally:
+        pass
+        # asyncio.run(delete_all())
 
 
 async def delete_all():
@@ -81,6 +95,8 @@ async def delete_all():
 
 
 if __name__ == "__main__":
+    # multiprocessing.freeze_support()
     # asyncio.run(main())
-    multiprocessing.freeze_support()
     multi_main()
+    # asyncio.run(delete_all())
+

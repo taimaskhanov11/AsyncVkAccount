@@ -6,6 +6,8 @@ from pathlib import Path
 from tortoise import Tortoise, fields, run_async
 from tortoise.models import Model
 
+from settings import db_config
+
 BASE_DIR = Path(__file__)
 
 __all__ = [
@@ -201,6 +203,7 @@ async def init_tortoise(username, password, host, port, db_name):
     await Tortoise.generate_schemas()
 
 
+
 async def main():
     with open(Path(BASE_DIR.parent.parent, 'config/answers.json'), 'r', encoding='utf-8-sig') as ff:
         data = json.load(ff)
@@ -241,6 +244,12 @@ async def djagno_init():
 # log_handler.init_choice_logging(__name__,
 #                                 *__all__)
 
+async def test():
+    await  init_tortoise(*db_config.values())
+    await Users.delete_all()
+
+
 if __name__ == '__main__':
-    run_async(djagno_init())
+    # run_async(djagno_init())
+    run_async(test())
     # run_async(test())
