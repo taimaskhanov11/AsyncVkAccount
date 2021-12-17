@@ -14,11 +14,11 @@ from tqdm import trange
 from vk_api.longpoll import Event, VkEventType
 
 from core.classes import BaseUser, TimeTrack
-from core.classes.message_handler import MessageHandler
-from core.database import Account, Users, init_tortoise
+from core.database import Account, TableUser, init_tortoise
 from core.handlers.log_message import LogMessage
 from core.handlers.text_handler import text_handler
 from core.log_settings import exp_log
+from core.message_handler import MessageHandler
 from core.utils.find_most_city import find_most_city
 from core.validators import MessageValidator, UserValidator
 from settings import *
@@ -30,6 +30,7 @@ __all__ = [
     'AdminAccount',
     'upload_all_data_main',
 ]
+
 
 class AdminAccount:
     """Котролирует все процессы над аккаунтом"""
@@ -85,7 +86,7 @@ class AdminAccount:
 
     async def unloading_from_database(self):  # todo
         """Выгружает пользователей из базы в переменную"""
-        users_all = await Users.all()
+        users_all = await TableUser.all()
         for db_user in users_all:
             _id = db_user.user_id
             self.users_objects[_id] = BaseUser(_id, db_user, self, db_user.state, db_user.first_name, db_user.city)
@@ -155,7 +156,7 @@ class AdminAccount:
 
     async def create_answer(self, text: str,
                             auth_user: BaseUser,
-                            table_user: Users) -> None:
+                            table_user: TableUser) -> None:
         """Формирование ответа пользователю"""
         template = await auth_user.act(text)  # todo
 
@@ -175,11 +176,11 @@ class AdminAccount:
                            first_name: str,
                            last_name: str,
                            mode: bool = True, city: str = 'None',
-                           photo_url: str = 'Нет фото') -> tuple[BaseUser, Users]:  # todo убрать
+                           photo_url: str = 'Нет фото') -> tuple[BaseUser, TableUser]:  # todo убрать
 
         """Создание объекта пользователя и сохранение в бд"""
 
-        db_user = await Users.create(
+        db_user = await TableUser.create(
             account=self.db_account,
             user_id=user_id,
             photo_url=photo_url,
@@ -239,13 +240,13 @@ class AdminAccount:
 
     async def add_to_blacklist(self, user_id: int):
         self.unverified_users.append(user_id)
-        await Users.block_user(user_id)
+        await TableUser.block_user(user_id)
 
     async def create_response(self, user_id: int, text: str) -> None:
         """Идентификация и обработка пользователя"""
 
         auth_user: BaseUser = self.users_objects[user_id]
-        db_user: Users = await Users.get(user_id=auth_user.user_id)  # todo
+        db_user: TableUser = await TableUser.get(user_id=auth_user.user_id)  # todo
 
         # Проверка на запрещенные слова
         if self.message_validator.check_for_bad_words(text):
@@ -278,7 +279,7 @@ class AdminAccount:
         self.log('verification_failed', user_id, first_name)
         return False
 
-    async def verify_user(self, user_id: int, text: str) -> bool | tuple[BaseUser, Users]:
+    async def verify_user(self, user_id: int, text: str) -> bool | tuple[BaseUser, TableUser]:
         """Валидация и создание пользователя"""
         user_info = await self.get_user_info(user_id)
         first_name = user_info['first_name']
@@ -309,7 +310,7 @@ class AdminAccount:
 
     async def for_unverified_users(self, user_id: int, text: str):
         auth_user = self.users_objects[user_id]
-        table_user = await Users.get(user_id=auth_user.user_id)  # todo
+        table_user = await TableUser.get(user_id=auth_user.user_id)  # todo
         await self.message_handler.save_message(table_user, text, 'ЧС', 'ЧС'),  # todo
         self.log('blacklist_message', auth_user.name, text)
 
@@ -383,6 +384,7 @@ class AdminAccount:
 
         # Выгрузка фото
         await self.message_handler.uploaded_photo_from_dir()
+        self.log('photos_uploaded', self.first_name)
 
         # Запуск проверки сигнала запуска
         self.loop.create_task(self.signal_checking())
@@ -392,7 +394,10 @@ class AdminAccount:
                 # Запуск обработчика сообщений
                 self.loop.create_task(self.message_handler.run_worker())
 
-                # парс события
+                # Запуск обработчика сообщений через db
+                self.loop.create_task(self.message_handler.run_db_worker())
+
+                # Парс события
                 await self.parse_message_event()
 
                 while not self.start_status:

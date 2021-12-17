@@ -187,9 +187,38 @@ class LogMessage:
     """ValidatorHandler"""
 
     @staticmethod
+    def validator_checking(text):
+        text_handler(signs['yellow'], text, 'warning')
+
+    @staticmethod
     def validator_success(text):
         text_handler(signs['yellow'], text)
 
     @staticmethod
     def validator_failure(text):
         text_handler(signs['red'], text, 'error')
+
+    """PhotoUploader"""
+
+    @staticmethod
+    def photos_uploaded(name):
+        text_handler(signs['version'], f'{name} | Фото выгружены', color='black')
+
+    """MessageSenderFromDb"""
+
+    @staticmethod
+    def message_db_worker_start(name):
+        text_handler(signs['sun'], f'{name} | Обработчик сообщений запущен из базы данных запущен!',
+                     color='blue')
+
+    @staticmethod
+    def db_message_send(name, text):
+        text_handler(signs['message'],
+                     f'Сообщение пользователю {name} c тексом: `{text}...` ⇑Отправлено',
+                     'info', 'blue')
+
+    @staticmethod
+    def message_db_end(name):
+        text_handler(signs['red'],
+                     f'{name} | Завершение обработчика сообщений через бд!', 'info',
+                     color='red')

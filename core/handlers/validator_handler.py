@@ -26,8 +26,7 @@ class ValidatorHandler:
 
                 @functools.wraps(func)
                 def wrapper(*args, **kwargs):
-                    text_handler(signs['yellow'], validator['check'], 'warning')
-
+                    log_collector('validator_checking', validator['check'])
                     res = func(*args, **kwargs)
                     if res:
                         log_collector('validator_success', validator['success'])

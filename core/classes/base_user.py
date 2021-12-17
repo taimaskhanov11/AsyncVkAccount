@@ -2,7 +2,7 @@ import asyncio
 import random
 import re
 
-from core.database import Numbers, Users
+from core.database import Number, TableUser
 from settings import conversation_stages
 
 
@@ -13,7 +13,7 @@ class TransparentUser:
 
 
 class BaseUser:
-    def __init__(self, user_id: int, db_user: Users, overlord, state: int, name: str, city: str):
+    def __init__(self, user_id: int, db_user: TableUser, overlord, state: int, name: str, city: str):
         self.overlord = overlord
         self.log = self.overlord.log
         self.db_user = db_user
@@ -32,7 +32,7 @@ class BaseUser:
 
     async def add_state(self):
         self.state += 1
-        await Users.add_state(self.user_id)
+        await TableUser.add_state(self.user_id)
 
     async def send_number(self, text: str) -> None:
         self.overlord.send_number_tg(
@@ -47,9 +47,9 @@ class BaseUser:
     async def number_success(self, text):
         self.log('number_success', self.user_id, self.name, text)
         await asyncio.gather(
-            Numbers.create(account=self.overlord.db_account,
-                           user=self.db_user, number=text),
-            Users.change_value(self.user_id, "blocked", True),
+            Number.create(account=self.overlord.db_account,
+                          user=self.db_user, number=text),
+            TableUser.change_value(self.user_id, "blocked", True),
             self.send_number(text)
         )
         self.overlord.unverified_users.append(self.user_id)  # todo

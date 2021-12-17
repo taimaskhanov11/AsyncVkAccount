@@ -5,8 +5,8 @@ from multiprocessing import Process
 
 import vk_bot
 from core import validators
-from core.classes import message_handler
-from core.database import Users, init_tortoise
+from core.message_handler import message_handler
+from core.database import TableUser, init_tortoise
 from core.handlers.log_message import LogMessage
 from core.handlers.validator_handler import validator_handler
 from core.handlers.log_router import log_handler
@@ -91,7 +91,7 @@ def multi_main():
 
 async def delete_all():
     await init_tortoise(*db_config.values())
-    await Users.delete_all()
+    await TableUser.delete_all()
 
 
 if __name__ == "__main__":

@@ -15,8 +15,8 @@ __all__ = [
     'Category',
     'Input',
     'Output',
-    'Numbers',
-    'Users',
+    'Number',
+    'TableUser',
     'Message',
     'Account',
     'init_tortoise',
@@ -43,7 +43,7 @@ class Account(Model):
         await account.save()
 
 
-class Users(Model):
+class TableUser(Model):
     account = fields.ForeignKeyField('models.Account', on_delete=fields.CASCADE, related_name='users')
     user_id = fields.IntField(unique=True, index=True)
     photo_url = fields.TextField(null=True)
@@ -90,9 +90,32 @@ class Users(Model):
         await user.save()
 
 
-class Numbers(Model):
+class Message(Model):
+    user = fields.ForeignKeyField('models.TableUser', on_delete=fields.CASCADE, related_name='messages', index=True)
+    account = fields.ForeignKeyField('models.Account', on_delete=fields.CASCADE, related_name='messages', index=True)
+    sent_at = fields.DatetimeField(auto_now_add=True)
+    text = fields.TextField()
+    answer_question = fields.TextField()
+    answer_template = fields.TextField()
+
+    class Meta:
+        table = "app_vk_controller_message"
+
+
+class SendMessage(Model):
+    user = fields.ForeignKeyField('models.TableUser', related_name='sended_messages', on_delete=fields.CASCADE)
+    account = fields.ForeignKeyField('models.Account', related_name='sended_messages', on_delete=fields.CASCADE)
+    sent_at = fields.DatetimeField()
+    text = fields.TextField()
+
+    @classmethod
+    async def wait_message(cls, user):
+        pass
+
+
+class Number(Model):
     account = fields.ForeignKeyField('models.Account', on_delete=fields.CASCADE, related_name='numbers')
-    user = fields.OneToOneField('models.Users', on_delete=fields.CASCADE, related_name='number')
+    user = fields.OneToOneField('models.TableUser', on_delete=fields.CASCADE, related_name='number')
     number = fields.TextField()
     date = fields.DatetimeField(default=datetime.datetime.now().replace(microsecond=0))
     created_at = fields.DatetimeField(auto_now_add=True)
@@ -177,18 +200,6 @@ class Output(Model):
         pass
 
 
-class Message(Model):
-    user = fields.ForeignKeyField('models.Users', on_delete=fields.CASCADE, related_name='messages', index=True)
-    account = fields.ForeignKeyField('models.Account', on_delete=fields.CASCADE, related_name='messages', index=True)
-    sent_at = fields.DatetimeField(auto_now_add=True)
-    text = fields.TextField()
-    answer_question = fields.TextField()
-    answer_template = fields.TextField()
-
-    class Meta:
-        table = "app_vk_controller_message"
-
-
 #
 
 
@@ -201,7 +212,6 @@ async def init_tortoise(username, password, host, port, db_name):
         modules={'models': ['core.database.apostgresql_tortoise_db']}
     )
     await Tortoise.generate_schemas()
-
 
 
 async def main():
@@ -246,7 +256,7 @@ async def djagno_init():
 
 async def test():
     await  init_tortoise(*db_config.values())
-    await Users.delete_all()
+    await TableUser.delete_all()
 
 
 if __name__ == '__main__':
