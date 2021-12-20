@@ -9,6 +9,5 @@ vk-api~=11.9.6
 Pillow~=8.4.0
 pyTelegramBotAPI~=4.2.0
 keyboard~=0.13.5
-pyautogui~=0.9.53
 requests~=2.26.0
 PyYAML~=6.0

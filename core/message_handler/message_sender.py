@@ -2,7 +2,7 @@ import asyncio
 import random
 
 from core.classes import BaseUser
-from core.database.apostgresql_tortoise_db import SendMessage
+from core.database.tortoise_db import SendMessage
 
 
 class MessageSender(asyncio.Queue):

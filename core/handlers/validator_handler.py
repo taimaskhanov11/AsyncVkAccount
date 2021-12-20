@@ -3,7 +3,7 @@ import inspect
 import time
 
 import keyboard
-import pyautogui
+# import pyautogui
 import telebot
 
 from settings import signs, views

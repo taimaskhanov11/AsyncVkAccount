@@ -1,6 +1,5 @@
 *.log
-tests
-tests_trash
+../../AppData/Roaming/JetBrains/PyCharm2021.3/scratches/tests_trash
 dist1
 build
 *.spec

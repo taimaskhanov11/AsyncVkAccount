@@ -14,7 +14,7 @@ from tqdm import trange
 from vk_api.longpoll import Event, VkEventType
 
 from core.classes import BaseUser, TimeTrack
-from core.database import Account, TableUser, init_tortoise
+from core.database import DbAccount, DbUser, init_tortoise
 from core.handlers.log_message import LogMessage
 from core.handlers.text_handler import text_handler
 from core.log_settings import exp_log
@@ -86,7 +86,7 @@ class AdminAccount:
 
     async def unloading_from_database(self):  # todo
         """Выгружает пользователей из базы в переменную"""
-        users_all = await TableUser.all()
+        users_all = await DbUser.all()
         for db_user in users_all:
             _id = db_user.user_id
             self.users_objects[_id] = BaseUser(_id, db_user, self, db_user.state, db_user.first_name, db_user.city)
@@ -112,7 +112,7 @@ class AdminAccount:
         try:
             res = await self.api.users.get(fields=['photo_max_orig'])
             self.info = res[0]
-            db_account = await Account.get_or_create(
+            db_account = await DbAccount.get_or_create(
                 user_id=self.info['id'], defaults={
                     'token': self.token,
                     'first_name': self.info['first_name'],
@@ -156,7 +156,7 @@ class AdminAccount:
 
     async def create_answer(self, text: str,
                             auth_user: BaseUser,
-                            table_user: TableUser) -> None:
+                            table_user: DbUser) -> None:
         """Формирование ответа пользователю"""
         template = await auth_user.act(text)  # todo
 
@@ -176,11 +176,11 @@ class AdminAccount:
                            first_name: str,
                            last_name: str,
                            mode: bool = True, city: str = 'None',
-                           photo_url: str = 'Нет фото') -> tuple[BaseUser, TableUser]:  # todo убрать
+                           photo_url: str = 'Нет фото') -> tuple[BaseUser, DbUser]:  # todo убрать
 
         """Создание объекта пользователя и сохранение в бд"""
 
-        db_user = await TableUser.create(
+        db_user = await DbUser.create(
             account=self.db_account,
             user_id=user_id,
             photo_url=photo_url,
@@ -240,13 +240,13 @@ class AdminAccount:
 
     async def add_to_blacklist(self, user_id: int):
         self.unverified_users.append(user_id)
-        await TableUser.block_user(user_id)
+        await DbUser.blocking(user_id)
 
     async def create_response(self, user_id: int, text: str) -> None:
         """Идентификация и обработка пользователя"""
 
         auth_user: BaseUser = self.users_objects[user_id]
-        db_user: TableUser = await TableUser.get(user_id=auth_user.user_id)  # todo
+        db_user: DbUser = await DbUser.get(user_id=auth_user.user_id)  # todo
 
         # Проверка на запрещенные слова
         if self.message_validator.check_for_bad_words(text):
@@ -279,7 +279,7 @@ class AdminAccount:
         self.log('verification_failed', user_id, first_name)
         return False
 
-    async def verify_user(self, user_id: int, text: str) -> bool | tuple[BaseUser, TableUser]:
+    async def verify_user(self, user_id: int, text: str) -> bool | tuple[BaseUser, DbUser]:
         """Валидация и создание пользователя"""
         user_info = await self.get_user_info(user_id)
         first_name = user_info['first_name']
@@ -310,7 +310,7 @@ class AdminAccount:
 
     async def for_unverified_users(self, user_id: int, text: str):
         auth_user = self.users_objects[user_id]
-        table_user = await TableUser.get(user_id=auth_user.user_id)  # todo
+        table_user = await DbUser.get(user_id=auth_user.user_id)  # todo
         await self.message_handler.save_message(table_user, text, 'ЧС', 'ЧС'),  # todo
         self.log('blacklist_message', auth_user.name, text)
 
@@ -326,7 +326,7 @@ class AdminAccount:
 
     async def event_analysis(self, event: Event) -> None:
         """Разбор события"""
-
+        # session_user = SessionUser(user_id=event.user_id, text = event.text.lower())
         text = event.text.lower()
         user_id = event.user_id
 
@@ -405,7 +405,7 @@ class AdminAccount:
 
             except VkAuthError as e:
                 self.log('acc_block_error', e, self.token)
-                await Account.blocking(self.user_id)
+                await DbAccount.blocking(self.user_id)
                 return
 
             except Exception as e:

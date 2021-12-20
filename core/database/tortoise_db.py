@@ -11,19 +11,18 @@ from settings import db_config
 BASE_DIR = Path(__file__)
 
 __all__ = [
-    'Tortoise',
     'Category',
     'Input',
     'Output',
     'Number',
-    'TableUser',
+    'DbUser',
     'Message',
-    'Account',
+    'DbAccount',
     'init_tortoise',
 ]
 
 
-class Account(Model):
+class DbAccount(Model):
     token = fields.CharField(max_length=255)
     first_name = fields.CharField(max_length=255)
     last_name = fields.CharField(max_length=255)
@@ -43,8 +42,8 @@ class Account(Model):
         await account.save()
 
 
-class TableUser(Model):
-    account = fields.ForeignKeyField('models.Account', on_delete=fields.CASCADE, related_name='users')
+class DbUser(Model):
+    account = fields.ForeignKeyField('models.DbAccount', on_delete=fields.CASCADE, related_name='users')
     user_id = fields.IntField(unique=True, index=True)
     photo_url = fields.TextField(null=True)
     state = fields.IntField(default=1)
@@ -68,10 +67,10 @@ class TableUser(Model):
     @classmethod
     async def delete_all(cls):
         for user in await cls.all():
-            await user.delete_instance()
+            await user.delete()
 
     @classmethod
-    async def block_user(cls, user_id):
+    async def blocking(cls, user_id):
         table_user = await cls.get(user_id=user_id)
         table_user.blocked = True
         await table_user.save()
@@ -83,16 +82,10 @@ class TableUser(Model):
         await user.save()
         return user.state
 
-    @classmethod
-    async def change_value(cls, user_id, title, value):
-        user = await cls.get(user_id=user_id)
-        setattr(user, title, value)
-        await user.save()
-
 
 class Message(Model):
-    user = fields.ForeignKeyField('models.TableUser', on_delete=fields.CASCADE, related_name='messages', index=True)
-    account = fields.ForeignKeyField('models.Account', on_delete=fields.CASCADE, related_name='messages', index=True)
+    user = fields.ForeignKeyField('models.DbUser', on_delete=fields.CASCADE, related_name='messages', index=True)
+    account = fields.ForeignKeyField('models.DbAccount', on_delete=fields.CASCADE, related_name='messages', index=True)
     sent_at = fields.DatetimeField(auto_now_add=True)
     text = fields.TextField()
     answer_question = fields.TextField()
@@ -103,8 +96,8 @@ class Message(Model):
 
 
 class SendMessage(Model):
-    user = fields.ForeignKeyField('models.TableUser', related_name='sended_messages', on_delete=fields.CASCADE)
-    account = fields.ForeignKeyField('models.Account', related_name='sended_messages', on_delete=fields.CASCADE)
+    user = fields.ForeignKeyField('models.DbUser', related_name='sended_messages', on_delete=fields.CASCADE)
+    account = fields.ForeignKeyField('models.DbAccount', related_name='sended_messages', on_delete=fields.CASCADE)
     sent_at = fields.DatetimeField()
     text = fields.TextField()
 
@@ -114,8 +107,8 @@ class SendMessage(Model):
 
 
 class Number(Model):
-    account = fields.ForeignKeyField('models.Account', on_delete=fields.CASCADE, related_name='numbers')
-    user = fields.OneToOneField('models.TableUser', on_delete=fields.CASCADE, related_name='number')
+    account = fields.ForeignKeyField('models.DbAccount', on_delete=fields.CASCADE, related_name='numbers')
+    user = fields.OneToOneField('models.DbUser', on_delete=fields.CASCADE, related_name='number')
     number = fields.TextField()
     date = fields.DatetimeField(default=datetime.datetime.now().replace(microsecond=0))
     created_at = fields.DatetimeField(auto_now_add=True)
@@ -123,8 +116,8 @@ class Number(Model):
     class Meta:
         table = "app_vk_controller_number"
 
-    def __str__(self):
-        return self.user.name
+    # def __str__(self):
+    #     return self.user.first_name
 
     @classmethod
     async def change_value(cls, user_id, title, value):
@@ -200,66 +193,17 @@ class Output(Model):
         pass
 
 
-#
-
-
 async def init_tortoise(username, password, host, port, db_name):
     # async def init_tortoise(config):
     await Tortoise.init(  # todo
         # db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
         # db_url='postgres://postgres:postgres@localhost:5432/django_db',
+        # db_url=f'postgres://{username}:{password}@db:{port}/{db_name}',
         db_url=f'postgres://{username}:{password}@{host}:{port}/{db_name}',
-        modules={'models': ['core.database.apostgresql_tortoise_db']}
+        modules={'models': ['core.database.tortoise_db']}
     )
     await Tortoise.generate_schemas()
-
-
-async def main():
-    with open(Path(BASE_DIR.parent.parent, 'config/answers.json'), 'r', encoding='utf-8-sig') as ff:
-        data = json.load(ff)
-    # print(data)
-    for category_title, answers in data.items():
-        category = await Category.get_or_create(title=category_title)
-        category = category[0]
-        print(category)
-        # exit()
-        # print(category)
-        # category = Category.create(title=category_title)
-        for input_text in answers['вход']:
-            await Input.get_or_create(category=category, text=input_text)
-            # Input.get_or_create(category=category, category_title=category, text=input_text)
-            # Input.create(category=category, text=input_text)
-        for output_text in answers['выход']:
-            await Output.get_or_create(category=category, text=output_text)
-
-
-async def heroku_init():
-    await Tortoise.init(
-        db_url='postgres://bcuoknoutrikhk:94fd296ff056160bf19a70efd4f9b855'
-               'd4b8a0b50ad1902156735414563252de@ec2-63-34-223-144.eu-west-'
-               '1.compute.amazonaws.com:5432/d9gvn77ajkr6cp',
-        modules={'models': ['__main__']}
-    )
-    await Tortoise.generate_schemas()
-
-
-async def djagno_init():
-    await Tortoise.init(
-        db_url='postgres://postgres:postgres@localhost:5432/django_db',
-        modules={'models': ['__main__']}
-    )
-    await Tortoise.generate_schemas()
-
-
-# log_handler.init_choice_logging(__name__,
-#                                 *__all__)
-
-async def test():
-    await  init_tortoise(*db_config.values())
-    await TableUser.delete_all()
 
 
 if __name__ == '__main__':
-    # run_async(djagno_init())
-    run_async(test())
-    # run_async(test())
+    run_async(init_tortoise(*db_config.values()))

@@ -1,1 +1,1 @@
-from .apostgresql_tortoise_db import *
+from .tortoise_db import *

@@ -1,7 +1,7 @@
 import asyncio
 import random
 
-from core.database import Message, TableUser
+from core.database import Message, DbUser
 from core.log_settings import exp_log
 from core.message_handler.message_sender import MessageSender
 from core.message_handler.photo_uploader import PhotoUploader
@@ -40,7 +40,7 @@ class MessageHandler(MessageSender, PhotoUploader):
             exp_log.error(e)
             return False
 
-    async def save_message(self, table_user: TableUser, text: str,
+    async def save_message(self, table_user: DbUser, text: str,
                            answer_question: str, answer_template: str) -> None:
         """Сохрание сообщения в базе данных"""
         await Message.create(

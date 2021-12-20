@@ -1,0 +1,11 @@
+# pyproject.toml
+# mark.skip(reason='whyskioed')
+# xfail (reason='whyskio)'
+# usefixtures=fixture будет вызыватся перед всеми тестами
+[tool.pytest.ini_options]
+minversion = "6.0"
+#addopts = "--color=yes --tb=short"
+addopts = "--color=yes -s -v"
+testpaths = [
+    "tests",
+]

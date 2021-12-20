@@ -5,12 +5,12 @@ from multiprocessing import Process
 
 import vk_bot
 from core import validators
-from core.message_handler import message_handler
-from core.database import TableUser, init_tortoise
+from core.database import DbUser, init_tortoise
 from core.handlers.log_message import LogMessage
-from core.handlers.validator_handler import validator_handler
 from core.handlers.log_router import log_handler
+from core.handlers.validator_handler import validator_handler
 from core.loggers.function_logger import flog
+from core.message_handler import message_handler
 from settings import db_config, tg_id, tg_token, vk_tokens
 from vk_bot import AdminAccount, upload_all_data_main
 
@@ -67,7 +67,7 @@ def run_queue_on_process(log_message, log_collector):
         [pr.start() for pr in processes]
         log_message.run()
     else:
-        log_process = multiprocessing.Process(target=log_message.run) #todo
+        log_process = multiprocessing.Process(target=log_message.run)  # todo
         log_process.start()
         print("Один токен")
         main(vk_tokens[0], log_collector)
@@ -91,7 +91,7 @@ def multi_main():
 
 async def delete_all():
     await init_tortoise(*db_config.values())
-    await TableUser.delete_all()
+    await DbUser.delete_all()
 
 
 if __name__ == "__main__":
@@ -99,4 +99,4 @@ if __name__ == "__main__":
     # asyncio.run(main())
     multi_main()
     # asyncio.run(delete_all())
-
+    pass
