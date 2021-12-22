@@ -10,6 +10,14 @@ text_handler_controller:
     accept_print_property: false
 
 
+# Тип запуска:
+# async, process, thread - асинхронный, многопроцессорный, многопоточный
+# async - оптимальный вариант между памятью и скоростью работы.
+# process - если хватает памяти и нужна скорость
+# thread - использует общую память, работает GIL, могут быть блокировки
+startup_type : process
+
+
 # База данных
 db_config:
     username: postgres

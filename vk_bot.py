@@ -14,8 +14,9 @@ from tqdm import trange
 from vk_api.longpoll import Event, VkEventType
 
 from core.classes import BaseUser, TimeTrack
-from core.database import DbAccount, DbUser, init_tortoise
-from core.handlers.log_message import LogMessage
+from core.database.models import DbAccount, DbUser
+from core.database.tortoise_db import init_tortoise
+from core.handlers.log_message import LogMessage, AsyncLogMessage
 from core.handlers.text_handler import text_handler
 from core.log_settings import exp_log
 from core.message_handler import MessageHandler
@@ -39,7 +40,7 @@ class AdminAccount:
             self, vk_token: str,
             tg_token: str,
             tg_user_id: int,
-            log_collector_queue: multiprocessing.Queue
+            log_message: LogMessage
     ) -> None:
         """
         :param vk_token: Токен аккаунта вк для создания сессии
@@ -71,7 +72,16 @@ class AdminAccount:
 
         self.validator = UserValidator()
         self.message_validator = MessageValidator(bad_words)
-        self.log = LogMessage(log_collector_queue)  # todo
+
+        # if isinstance(log_collector_queue, LogMessage):
+        #     print('LogMessage')
+        #     self.log = log_collector_queue  # todo
+        # else:
+        #     print('log_collector_queue')
+        #     self.log = LogMessage(log_collector_queue)  # todo
+
+        # self.log = AsyncLogMessage(log_collector_queue)  # todo
+        self.log = log_message  # todo
         self.message_handler = MessageHandler(self)
 
         self.users_block = collections.defaultdict(int)

@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from tortoise import Tortoise
 
-from core.database import init_tortoise, DbAccount
+from core.database import init_tortoise
 
 
 @pytest.fixture(scope="session")
@@ -32,13 +32,3 @@ async def init_db(db_data):
         await Tortoise.close_connections()
 
 
-@pytest.fixture
-async def db_account():
-    return await DbAccount.create(
-        token="test_token",
-        first_name="test_first_name",
-        last_name="test_last_name",
-        user_id=1,
-        photo_url='test_photo_url',
-
-    )

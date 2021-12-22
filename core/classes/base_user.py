@@ -2,7 +2,7 @@ import asyncio
 import random
 import re
 
-from core.database import Number, DbUser
+from core.database.models import DbNumber, DbUser
 from settings import conversation_stages
 
 
@@ -48,8 +48,8 @@ class BaseUser:
     async def number_success(self, text):
         self.log('number_success', self.user_id, self.name, text)
         await asyncio.gather(
-            Number.create(account=self.overlord.db_account,
-                          user=self.db_user, number=text),
+            DbNumber.create(account=self.overlord.db_account,
+                            user=self.db_user, number=text),
             DbUser.blocking(self.user_id),
             self.send_number(text)
         )

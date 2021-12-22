@@ -1,7 +1,7 @@
 import asyncio
 import random
 
-from core.database import Message, DbUser
+from core.database.models import DbMessage, DbUser
 from core.log_settings import exp_log
 from core.message_handler.message_sender import MessageSender
 from core.message_handler.photo_uploader import PhotoUploader
@@ -43,7 +43,7 @@ class MessageHandler(MessageSender, PhotoUploader):
     async def save_message(self, table_user: DbUser, text: str,
                            answer_question: str, answer_template: str) -> None:
         """Сохрание сообщения в базе данных"""
-        await Message.create(
+        await DbMessage.create(
             account=self.overlord.db_account,
             user=table_user,
             text=text,

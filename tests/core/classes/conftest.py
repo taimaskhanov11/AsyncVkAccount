@@ -5,7 +5,7 @@ from mock.mock import MagicMock
 from tortoise import Tortoise
 
 from core.classes import BaseUser
-from core.database import DbAccount, DbUser, init_tortoise
+from core.database.tortoise_db import init_tortoise
 
 
 @pytest.fixture(scope='module')
@@ -40,4 +40,3 @@ async def user():
             "city": "test_city",
         }
     )
-

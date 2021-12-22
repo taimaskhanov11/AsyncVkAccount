@@ -1,3 +1,4 @@
+import asyncio
 import multiprocessing
 
 from core.handlers import text_handler
@@ -7,13 +8,13 @@ from settings import signs
 
 class LogMessage:
 
-    def __init__(self, log_collector_queue: multiprocessing.Queue):
+    def __init__(self, log_collector_queue):
         self.queue = log_collector_queue
 
     def __call__(self, func_name, *args):
         self.queue.put((func_name, args))
 
-    def run(self):
+    def run_process_worker(self):
         """Для запуска в отдельном процессе"""
         while True:
             func_name, args = self.queue.get()
@@ -21,6 +22,26 @@ class LogMessage:
             func = getattr(self, func_name)
             # print(func_name, args)
             func(*args)
+
+    async def run_async_worker(self):
+        while True:
+            func_name, args = await self.queue.get()
+            # print('func', '=', func_name, args)
+            func = getattr(self, func_name)
+            # func(*args)
+            await asyncio.gather(
+                asyncio.to_thread(func, *args)
+            )
+            self.queue.task_done()
+
+            # print('task_done')
+    @staticmethod
+    def start_type(text):
+        text_handler(signs['green'],
+                     text,
+                     'info',)
+
+
 
     @staticmethod
     def prog_log(text):
@@ -222,3 +243,12 @@ class LogMessage:
         text_handler(signs['red'],
                      f'{name} | Завершение обработчика сообщений через бд!', 'info',
                      color='red')
+
+
+class AsyncLogMessage(LogMessage):
+
+    def __call__(self, func_name, *args):
+        # print(func_name, *args,'AsyncLogMessage' )
+        self.queue.put_nowait((func_name, args))
+
+

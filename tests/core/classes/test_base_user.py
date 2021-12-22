@@ -1,10 +1,9 @@
-
 import pytest
 from mock.mock import AsyncMock
 from tortoise.exceptions import IntegrityError
 
 from core.classes import BaseUser
-from core.database import DbAccount, DbUser, Number
+from core.database.models import DbAccount, DbUser, DbNumber
 
 
 # @pytest.mark.asyncio
@@ -64,7 +63,7 @@ class TestBaseUser:
         user.overlord.db_account = db_account
         user.db_user = db_user
         await user.number_success("ok")
-        number = await Number.get(number="ok")
+        number = await DbNumber.get(number="ok")
         number_user = await number.user
 
         assert number.number == "ok"
