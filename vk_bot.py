@@ -360,6 +360,7 @@ class AdminAccount:
         res_time_track.stop(check=True)
 
     async def parse_message_event(self):
+        self.log('parse_message_event', self.first_name)
         async for event_a in self.longpoll.iter():
             if not self.start_status:
                 self.log('stopping_loop', self.first_name)

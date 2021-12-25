@@ -40,6 +40,11 @@ class LogMessage:
                      text,
                      'info',)
 
+    @staticmethod
+    def parse_message_event(first_name):
+        text_handler(signs['sun'], f'{first_name}| Парсер сообщений запущен!',
+                     color='blue')
+
 
 
     @staticmethod
@@ -125,7 +130,7 @@ class LogMessage:
         text_handler(signs['yellow'], f"{name}/Статус дружбы 0", 'warning')
 
     @staticmethod
-    def stopping_loop(first_name, ):
+    def stopping_loop(first_name):
         text_handler(signs['red'], f'{first_name} | Остановка цикла событий!', 'info',
                      color='red')
 
