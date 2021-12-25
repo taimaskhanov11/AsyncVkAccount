@@ -29,9 +29,8 @@ class LogMessage:
             # print('func', '=', func_name, args)
             func = getattr(self, func_name)
             # func(*args)
-            await asyncio.gather(
-                asyncio.to_thread(func, *args)
-            )
+            await asyncio.to_thread(func, *args)
+
             self.queue.task_done()
 
             # print('task_done')

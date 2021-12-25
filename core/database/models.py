@@ -88,10 +88,12 @@ class DbMessage(models.Model):
 
 
 class SendMessage(models.Model):
-    user = fields.ForeignKeyField('models.DbUser', related_name='sended_messages', on_delete=fields.CASCADE)
-    account = fields.ForeignKeyField('models.DbAccount', related_name='sended_messages', on_delete=fields.CASCADE)
-    sent_at = fields.DatetimeField()
-    text = fields.TextField()
+    message = fields.OneToOneField('models.DbMessage', on_delete=fields.CASCADE, related_name='sended_message')
+    sent_at = fields.DatetimeField(auto_now_add=True)
+    status = fields.BooleanField(default=False)
+
+    class Meta:
+        table = "app_vk_controller_sendmessage"
 
     @classmethod
     async def wait_message(cls, user):

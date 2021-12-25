@@ -15,12 +15,9 @@ _ todo MAIN
 # todo update_logger
 # todo добавить к соощениям через db отправку фото
 # todo добавить отправку сообщений с задержкой через бд
-
-
-
+# todo внедрить loguru
 
 # done добавить обработку фото
-
 
 TODO
 # todo добавить type hinting

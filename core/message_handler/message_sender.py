@@ -47,20 +47,24 @@ class MessageSender(asyncio.Queue):
 
             await asyncio.sleep(3)
             # Вытаскиваем сообщение из очереди.
-            messages = await SendMessage.all().select_related('user')
+
+            smessages = await SendMessage.filter(status=False).select_related('message', 'message__user')
 
             # Отправка сообщения
-            for message in messages:
-                await self.send_message(message.user.user_id, message.text),
-                self.log('db_message_send', message.user.first_name, message.text, self.delay)
+            for smessage in smessages:
+                await self.send_message(
+                    smessage.message.user.user_id,
+                    smessage.message.answer_question)
+                smessage.status = True
+                await smessage.save()
+
+                self.log('db_message_send', smessage.message.user.first_name, smessage.message.answer_question)
 
             # Проверка сигнала завершения
             if self.empty():
                 if not self.overlord.start_status:
                     self.log('message_db_end', self.overlord.first_name)
                     break
-
-
 
     async def send_delaying_message(self, auth_user: BaseUser, text: str, attachment: str) -> None:
         """Создание отложенного сообщения"""
