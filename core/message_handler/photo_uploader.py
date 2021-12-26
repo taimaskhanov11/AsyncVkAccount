@@ -1,8 +1,10 @@
+import asyncio
 import os
 from pathlib import Path
 
 import requests
 from vk_api.upload import FilesOpener
+
 
 BASE_DIR = Path(__file__).parent.parent.parent
 IMAGE_DIR = Path(BASE_DIR, 'config/image')
@@ -10,7 +12,8 @@ IMAGE_DIR = Path(BASE_DIR, 'config/image')
 
 class PhotoUploader:
 
-    def __init__(self):
+    def __init__(self, overlord):
+        self.overlord = overlord
         self.http = requests.Session()
         self.http.headers.pop('user-agent')
         self.photos = {}
@@ -35,3 +38,21 @@ class PhotoUploader:
             response = self.http.post(url, files=photo_files)
         photos = await self.overlord.api('photos.saveMessagesPhoto', **response.json())
         return [{'id': im['id'], 'owner_id': im['owner_id'], 'access_key': im['access_key']} for im in photos]
+
+
+async def main():
+    from settings import vk_tokens, tg_token, tg_id
+    from vk_bot import AdminAccount
+    from core.handlers.log_message import LogMessage
+    from queue import Queue
+    thread_log_collector = Queue()
+    acc_log_message = LogMessage(thread_log_collector)
+    vk = AdminAccount(vk_tokens[0], tg_token, tg_id, acc_log_message)
+    ph = PhotoUploader(vk)
+    await  ph.uploaded_photo_from_dir()
+
+if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
+    # asyncio.run(main())
+

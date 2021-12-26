@@ -17,8 +17,6 @@ from core.classes import BaseUser, TimeTrack
 from core.database.models import DbAccount, DbUser
 from core.database.tortoise_db import init_tortoise
 from core.handlers.log_message import LogMessage, AsyncLogMessage
-from core.handlers.text_handler import text_handler
-from core.log_settings import exp_log
 from core.message_handler import MessageHandler
 from core.utils.find_most_city import find_most_city
 from core.validators import MessageValidator, UserValidator
@@ -29,7 +27,6 @@ colorama_init()
 __all__ = [
     'TimeTrack',
     'AdminAccount',
-    'upload_all_data_main',
 ]
 
 
@@ -70,7 +67,7 @@ class AdminAccount:
         self.unverified_users = []
         self.verifying_users = []
 
-        self.validator = UserValidator()
+        self.validator = UserValidator(self)
         self.message_validator = MessageValidator(bad_words)
 
         # if isinstance(log_collector_queue, LogMessage):
@@ -93,6 +90,9 @@ class AdminAccount:
         self.db_account = None  # init in get_self_info
         self.signal_end = False
         self.start_status = True
+
+    def __str__(self):
+        return self.first_name
 
     async def unloading_from_database(self):  # todo
         """Выгружает пользователей из базы в переменную"""
@@ -134,12 +134,11 @@ class AdminAccount:
             self.user_id = self.info['id']
             self.db_account = db_account[0]
             self.start_status = self.db_account.start_status
-            text_handler(signs['version'], f'{self.info["first_name"]} {self.info["last_name"]}', color='yellow')
+            self.log('self_info', f'{self.info["first_name"]} {self.info["last_name"]}')
             return True
 
         except VkAuthError as e:
-            self.block_account_message()
-            exp_log.critical(f'Ошибка токена {self.token} | {e}')
+            self.log('token_error', f'Ошибка токена {self.token} | {e}')
             return False
 
     def parse_event(self, raw_event: list) -> Event:
@@ -149,7 +148,6 @@ class AdminAccount:
         # answer = await Input.find_output(text, auth_user.city) #todo поиск через Таблицу
         # answer, attachment = await search_answer(text, auth_user.city)
         answer, attachment = self.message_handler.search_answer(text, auth_user.city)
-        # print(attachment)
         if not answer:
             self.log('no_answer_found', auth_user.user_id, auth_user.name, text)
 
@@ -177,10 +175,6 @@ class AdminAccount:
         else:
             answer, attachment, template = self.template_invalid(auth_user.user_id, auth_user.name)
         await self.message_handler.save_message(table_user, text, f'{answer}>{attachment}', template)
-
-    def block_account_message(self):
-        text_handler(signs['version'], f'Ошибка токена {self.token}', 'error',
-                     color='red')
 
     async def update_users(self, user_id: int,
                            first_name: str,
@@ -423,39 +417,6 @@ class AdminAccount:
                 self.log('auth_error', e)
             # finally:
             #     await self.session.close()
-
-
-# @log_handler
-def upload_all_data_main(statusbar=False):
-    """Инициализация данных профиля"""
-    try:
-        text_handler(f"VkBot v{bot_version}", '', color='blue')
-        text_handler(signs['magenta'], f'Загруженно токенов {len(vk_tokens)}: ', color='magenta')
-        for a, b in enumerate(vk_tokens, 1):
-            text_handler(signs['magenta'], f"    {b}", color='magenta')
-
-        delay = f"[{message_config['delay_response_from']} - {message_config['delay_response_to']}] s"
-        text_handler(signs['magenta'], f"    Задержка перед ответом : {delay}", color='cyan')
-        delay = f"[{message_config['delay_typing_from']} - {message_config['delay_typing_to']}] s"
-        text_handler(signs['magenta'], f"    Длительность отображения печати : {delay}", color='cyan')
-
-        # Выгрузка стадий и юзеров
-
-        # todo
-        text_handler(signs['magenta'], 'Проверка прокси:', color='magenta')
-        for proxy in settings['proxy']:
-            text_handler(signs['magenta'], '    PROXY {proxy} IS WORKING'.format(proxy=proxy))
-        time.sleep(1)
-
-        if statusbar:
-            for _ in trange(300, colour='green', smoothing=0.1, unit_scale=True):
-                time.sleep(0.001)
-        # if is_bad_proxy(proxy):
-        #     await TextHandler(SIGNS['magenta'], f"    BAD PROXY {proxy}", log_type='error', full=True)
-        # else:
-        #     await TextHandler(SIGNS['magenta'], '    PROXY {proxy} IS WORKING')
-    except Exception as e:
-        exp_log.exception(e)
 
 # log_handler.init_choice_logging(__name__,
 #                                 *__all__)

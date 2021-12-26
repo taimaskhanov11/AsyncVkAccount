@@ -3,11 +3,12 @@ import inspect
 import os
 import time
 
+from loguru import logger
+
 from core.handlers.log_message import LogMessage
-from settings import settings
 
-accept_handling = settings['text_handler_controller']['accept_handling']  # todo
 
+# from core.new_log_settings import logger
 
 class FunctionLogger:
 
@@ -23,6 +24,7 @@ class FunctionLogger:
         def error_logger(func):
             path = os.path.basename(inspect.getsourcefile(func))
 
+            @logger.catch
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 now = time.monotonic()  # todo
@@ -31,10 +33,10 @@ class FunctionLogger:
                 end = time.monotonic() - now
                 execute_time = f'{"Executed time"} {round(end, 5)}'
                 func_name = f'{path}/{func.__name__}'
-                if accept_handling:
-                    log_collector('prog_log', f'{func_name:<36} {execute_time:<19} {"|async":<6}| {args} {kwargs}')
+                log_collector('prog_log', f'{func_name:<36} {execute_time:<19} {"|async":<6}| {args} {kwargs}')
                 return res
 
+            @logger.catch
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
                 now = time.monotonic()
@@ -42,8 +44,7 @@ class FunctionLogger:
                 end = time.monotonic() - now
                 execute_time = f'{"Executed time"} {round(end, 5)}'
                 func_name = f'{path}/{func.__name__}'
-                if accept_handling:
-                    log_collector('prog_log', f'{func_name:<36} {execute_time:<19} {"|sync":<6}| {args} {kwargs}')
+                log_collector('prog_log', f'{func_name:<36} {execute_time:<19} {"|sync":<6}| {args} {kwargs}')
                 return res
 
             if include:

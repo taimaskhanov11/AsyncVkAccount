@@ -16,7 +16,7 @@ class MessageHandler(MessageSender, PhotoUploader):
 
     def __init__(self, overlord):  # todo
         super().__init__(overlord)
-        PhotoUploader.__init__(self)
+        PhotoUploader.__init__(self, overlord)
 
     def search_answer(self, text: str, city: str):  # todo
         answer_end = ''

@@ -53,7 +53,11 @@ class DbUser(models.Model):
         return self.first_name
 
     async def delete_instance(self):
-        await DbMessage.filter(user=self).delete()
+        for m in await DbMessage.filter(user=self):
+            for s in await SendMessage.filter(message=m):
+                await s.delete()
+            await m.delete()
+        # await
         await self.delete()
 
     @classmethod

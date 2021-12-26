@@ -5,7 +5,7 @@ from settings import log_colors, settings, text_settings
 
 accept_handling = settings['text_handler_controller']['accept_handling']
 
-
+# OLD
 def text_handler(sign: str,  # todo
                  text: str,
                  log_type: str = 'info',

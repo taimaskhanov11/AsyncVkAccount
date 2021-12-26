@@ -31,7 +31,9 @@ __all__ = [
     # 'log'
 ]
 
-from core.log_settings import exp_log
+# from core.log_settings import exp_log
+from loguru import logger
+from core.new_log_settings import log_configurate
 
 BASE_DIR = Path(__file__).parent
 
@@ -65,10 +67,16 @@ views = read_json('config/validators_text.json')  # текс для валида
 bad_words = read_yaml('config/bad_words.yaml')
 
 bot_version = settings['version']
-text_settings = settings['text_handler_controller']
+
+text_settings = settings['text_handler_controller'] #OLD
+
 token_config = settings['token_config']
 message_config = settings['message_config']
 db_config = settings['db_config']
+log_settings = settings['log_settings']
+
+
+log_configurate(log_settings)
 
 try:
     tg_token = os.getenv('tg_token') or token_config['telegram_token']
@@ -76,7 +84,7 @@ try:
     # tg_id = [int(os.getenv('tg_id'))] if os.getenv('tg_id') else token_config['telegram_id']
     vk_tokens = [os.getenv('tokens')] if os.getenv('tokens') else token_config['vk_tokens']
 except Exception as e:
-    exp_log.exception(e)
+    logger.exception(e)
     print('Неправильный ввод ВК или ТГ токена')
 
 signs = {

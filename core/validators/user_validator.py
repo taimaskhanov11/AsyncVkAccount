@@ -1,12 +1,10 @@
 import asyncio
 
-from core.handlers import text_handler
-from settings import signs
-
 
 class UserValidator:
 
-    def __init__(self):
+    def __init__(self, overlord):
+        self.overlord = overlord
         self.validators = (
             self.photo_validator,
             self.age_validator,
@@ -27,19 +25,14 @@ class UserValidator:
         female, male, age = m_f_count.count(1), m_f_count.count(2), user_info.get('bdate')
         has_photo, count_friend = user_info['has_photo'], friend_list['count']
 
-        self.info_view(user_info, count_friend, age, has_photo)
+        self.overlord.log('info_view', user_info['first_name'], user_info['id'], count_friend, age, has_photo)
+        # self.info_view(user_info, count_friend, age, has_photo)
         return self.all_validators(has_photo, age, count_friend, (male, female, count_friend))
 
     def all_validators(self, has_photo: int, age: str, count_friend: int, mfc: tuple[int, int, int], ) -> bool:
         return all(
             (func(arg) for func, arg in zip(self.validators, (has_photo, age, count_friend, mfc)))
         )
-
-    def info_view(self, info, count_friend, age, has_photo):
-        text_handler(signs['yellow'], f"{info['first_name']}, {info['last_name']}, {info['id']}", 'warning')
-        text_handler(signs['yellow'], f"{count_friend} - Количество друзей", 'warning')
-        text_handler(signs['yellow'], f'Возраст - {age}', 'warning')
-        text_handler(signs['yellow'], f'Фото {has_photo}', 'warning')
 
     def photo_validator(self, photo: int) -> bool:
         return bool(photo)
@@ -57,7 +50,7 @@ class UserValidator:
                 return True  # todo
         except Exception as e:
             # exp_log.exception(e)
-            text_handler(signs['red'], f'Неккоректный возраст {age}', 'error')
+            self.overlord.log('incorrect_age', age)
             return True
 
     def count_friends_validator(self, count: int) -> bool:

@@ -1,5 +1,5 @@
 # Текущая версия бота
-version: 2.5.0.1
+version: 2.9.2.2
 
 # Логирование
 text_handler_controller:
@@ -9,13 +9,23 @@ text_handler_controller:
     accept_printing: true
     accept_print_property: false
 
+# Логирование
+log_settings:
+  DEBUG: false
+  INFO: true
+  TALK: true
+  XANSWER: true
+  SUCCESS: true
+  WARNING: true
+  ERROR: true
+  CRITICAL: true
 
 # Тип запуска:
 # async, process, thread - асинхронный, многопроцессорный, многопоточный
 # async - оптимальный вариант между памятью и скоростью работы.
 # process - если хватает памяти и нужна скорость
 # thread - использует общую память, работает GIL, могут быть блокировки
-startup_type : process
+startup_type : async
 
 
 # База данных
@@ -59,13 +69,13 @@ message_config:
     block_message_count: 2
 
     # Задержка сообщения для каждого пользователя в секундах
-    delay_response_from: 1
-    delay_response_to: 2
+    delay_response_from: 0
+    delay_response_to: 0
 
     # Время отображния иконки печати
-    delay_typing_from: 2  # от
-    delay_typing_to: 5    # до
+    delay_typing_from: 0  # от
+    delay_typing_to: 0    # до
 
     # Задержка между отправкой сообщений из очереди, 8 это оптимальный вариант.
     # Менять только если начали банить вк или при крайней необходимости
-    delay_between_messages_for_account: 8
+    delay_between_messages_for_account: 0

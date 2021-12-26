@@ -3,9 +3,6 @@ import sys
 
 from core.handlers.log_message import LogMessage
 from core.loggers.class_logger import clog, flog
-from settings import settings
-
-accept_handling = settings['text_handler_controller']['accept_handling']
 
 
 class Router:
@@ -17,10 +14,6 @@ class Router:
         include = kwargs.get('include')
 
         def decorator(obj):
-
-            # Если отключен хендлер возвращаем тот же объект
-            if not accept_handling:
-                return obj
 
             if include:
                 if obj.__name__ not in include:
