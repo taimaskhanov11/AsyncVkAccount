@@ -120,16 +120,16 @@ class DbCategory(models.Model):
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
-        table = "app_vk_controller_category"
+        table = "app_answer_category"
 
 
 class DbInput(models.Model):
-    category = fields.ForeignKeyField('models.DbCategory', on_delete=fields.CASCADE, related_name='input')
+    category = fields.ForeignKeyField('models.DbCategory', on_delete=fields.CASCADE, related_name='inputs')
     text = fields.CharField(index=True, max_length=255)
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
-        table = "app_vk_controller_input"
+        table = "app_answer_input"
 
     @classmethod
     def create_from_dict(cls):
@@ -159,9 +159,9 @@ class DbInput(models.Model):
 
 
 class DbOutput(models.Model):
-    category = fields.ForeignKeyField('models.DbCategory', on_delete=fields.CASCADE, related_name='output')
+    category = fields.ForeignKeyField('models.DbCategory', on_delete=fields.CASCADE, related_name='outputs')
     text = fields.TextField()
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
-        table = "app_vk_controller_output"
+        table = "app_answer_output"

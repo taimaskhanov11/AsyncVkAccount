@@ -320,10 +320,7 @@ class LogMessage:
 
     @staticmethod
     def info_view(first_name, _id, count_friend, age, has_photo):
-        logger.info(f"{first_name}, {_id}\n"
-                    f"{count_friend} - Количество друзей\n"
-                    f"f'Возраст - {age}\n"
-                    f"f'Фото {has_photo}\n")
+        logger.info(f"{first_name}, {_id}|{count_friend} - Количество друзей|Возраст - {age}|Фото {has_photo}")
 
     @staticmethod
     def incorrect_age(age):
