@@ -3,8 +3,8 @@ from pathlib import Path
 from loguru import logger
 from tortoise import Tortoise, run_async
 
-from core.database.models import DbUser, DbInput, DbOutput, DbCategory
-from settings import db_config, ai_logic
+from core.database.models import DbCategory, DbInput, DbOutput, DbUser
+from settings import ai_logic, db_config
 
 BASE_DIR = Path(__file__)
 

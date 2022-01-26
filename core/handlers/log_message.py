@@ -5,10 +5,6 @@ import threading
 from core.new_log_settings import logger
 
 
-# def text_handler():
-#
-#     logger.log()
-
 class LogMessage:
 
     def __init__(self, log_collector_queue: queue.Queue):
@@ -21,12 +17,8 @@ class LogMessage:
     def run_thread_worker(self):
         logger.info(f'ПОТОК ОБРАБОТЧИК {threading.current_thread()}')
         while True:
-            # print(self.queue.unfinished_tasks)
-            # time.sleep(2)
             func_name, args = self.queue.get()
-            # print(func_name, args)
             func = getattr(self, func_name)
-            # print(func_name, args)
             func(*args)
             self.queue.task_done()
             logger.debug(f'Незавершенных задач осталось {self.queue.unfinished_tasks}')
@@ -43,14 +35,9 @@ class LogMessage:
     async def run_async_worker(self):
         while True:
             func_name, args = await self.queue.get()
-            # print('func', '=', func_name, args)
             func = getattr(self, func_name)
-            # func(*args)
             await asyncio.to_thread(func, *args)
-
             self.queue.task_done()
-
-            # print('task_done')
 
     @staticmethod
     def start_type(text):

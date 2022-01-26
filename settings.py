@@ -4,6 +4,9 @@ from pathlib import Path
 
 import yaml
 from aiovk import TokenSession
+from loguru import logger
+
+from core.new_log_settings import log_configurate
 
 # from polog import config, file_writer
 # config.add_handlers(file_writer(str(Path(BASE_DIR, 'logs/new_log.log'))))
@@ -32,12 +35,8 @@ __all__ = [
 ]
 
 # from core.log_settings import exp_log
-from loguru import logger
-from core.new_log_settings import log_configurate
 
 BASE_DIR = Path(__file__).parent
-
-
 
 
 def read_json(path, encoding='utf-8-sig'):
@@ -68,13 +67,12 @@ bad_words = read_yaml('config/bad_words.yaml')
 
 bot_version = settings['version']
 
-text_settings = settings['text_handler_controller'] #OLD
+text_settings = settings['text_handler_controller']  # OLD
 
 token_config = settings['token_config']
 message_config = settings['message_config']
 db_config = settings['db_config']
 log_settings = settings['log_settings']
-
 
 log_configurate(log_settings)
 

@@ -3,8 +3,7 @@ from mock.mock import AsyncMock
 from tortoise.exceptions import IntegrityError
 
 from core.classes import BaseUser
-from core.database.models import DbAccount, DbUser, DbNumber
-
+from core.database.models import DbAccount, DbNumber, DbUser
 
 # @pytest.mark.asyncio
 # async def test_connect_db():
@@ -88,10 +87,10 @@ class TestBaseUser:
         user.overlord.send_number_tg = AsyncMock()
         user.overlord.db_account = db_account
         user.db_user = db_user
-        user.overlord.unverified_users = []
+        user.overlord.banned_users = []
         await user.number_success("ok1234")
 
-        assert user.user_id in user.overlord.unverified_users
+        assert user.user_id in user.overlord.banned_users
 
     @pytest.mark.parametrize(
         "text", ["Hello friend", "Yes of course", "123 not a number just int", "198"]

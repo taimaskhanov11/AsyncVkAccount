@@ -7,7 +7,6 @@ from loguru import logger
 
 from core.handlers.log_message import LogMessage
 
-
 # from core.new_log_settings import logger
 
 class FunctionLogger:

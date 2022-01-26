@@ -5,8 +5,8 @@
 import random
 from pathlib import Path
 
-from more_termcolor import colored
 import async_eel
+from more_termcolor import colored
 
 
 async def init_eel():

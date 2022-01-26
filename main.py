@@ -1,5 +1,6 @@
 import asyncio
 import multiprocessing
+import queue
 import threading
 import time
 from multiprocessing import Process
@@ -8,16 +9,16 @@ from loguru import logger
 from tqdm import trange
 
 import vk_bot
-import queue
 from core import validators
 from core.database.models import DbUser
 from core.database.tortoise_db import init_tortoise
-from core.handlers.log_message import LogMessage, AsyncLogMessage
+from core.handlers.log_message import AsyncLogMessage, LogMessage
 from core.handlers.log_router import log_handler
 from core.handlers.validator_handler import validator_handler
 from core.loggers.function_logger import flog
 from core.message_handler import message_handler
-from settings import db_config, tg_id, tg_token, vk_tokens, settings, bot_version, message_config
+from settings import (bot_version, db_config, message_config, settings, tg_id,
+                      tg_token, vk_tokens)
 
 
 # from core import new_log_settings
@@ -34,7 +35,7 @@ def upload_all_data_main(statusbar=False):
         delay = f"[{message_config['delay_typing_from']} - {message_config['delay_typing_to']}] s"
         logger.info(f"    Длительность отображения печати : {delay}")
         # todo
-        logger.info( 'Проверка прокси:')
+        logger.info('Проверка прокси:')
         for proxy in settings['proxy']:
             logger.success('    PROXY {proxy} IS WORKING'.format(proxy=proxy))
 
@@ -47,7 +48,6 @@ def upload_all_data_main(statusbar=False):
         #     await TextHandler(SIGNS['magenta'], '    PROXY {proxy} IS WORKING')
     except Exception as e:
         logger.exception(e)
-
 
 
 async def asyncio_start(log_message, thread_log_collector):
@@ -89,18 +89,20 @@ def init_logging_main(log_message: LogMessage) -> None:
     )
     vk_bot.find_most_city = flog(vk_bot.find_most_city, log_collector=log_message)
     # utils.find_most_city = flog(utils.find_most_city, log_collector=log_collector)
-    validators.UserValidator = validator_handler(validators.UserValidator,
-                                                 log_collector=log_message,
-                                                 exclude=['validate'])  # todo
-    message_handler.MessageHandler = log_handler(message_handler.MessageHandler,
-                                                 include=[
-                                                     # 'run_worker',
-                                                     'search_answer',
-                                                     'uploaded_photo_from_dir',
-                                                     'uploaded_photo',
-                                                     'unverified_delaying',
-                                                     'send_delaying_message',
-                                                     'save_message'])
+    validators.UserValidator = validator_handler(
+        validators.UserValidator,
+        log_collector=log_message,
+        exclude=['validate'])  # todo
+    message_handler.MessageHandler = log_handler(
+        message_handler.MessageHandler,
+        include=[
+            # 'run_worker',
+            'search_answer',
+            'uploaded_photo_from_dir',
+            'uploaded_photo',
+            'unverified_delaying',
+            'send_delaying_message',
+            'save_message'])
 
 
 async def process_start(token, log_collector):

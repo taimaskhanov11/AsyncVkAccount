@@ -5,7 +5,6 @@ from pathlib import Path
 import requests
 from vk_api.upload import FilesOpener
 
-
 BASE_DIR = Path(__file__).parent.parent.parent
 IMAGE_DIR = Path(BASE_DIR, 'config/image')
 
@@ -41,10 +40,11 @@ class PhotoUploader:
 
 
 async def main():
-    from settings import vk_tokens, tg_token, tg_id
-    from vk_bot import AdminAccount
-    from core.handlers.log_message import LogMessage
     from queue import Queue
+
+    from core.handlers.log_message import LogMessage
+    from settings import tg_id, tg_token, vk_tokens
+    from vk_bot import AdminAccount
     thread_log_collector = Queue()
     acc_log_message = LogMessage(thread_log_collector)
     vk = AdminAccount(vk_tokens[0], tg_token, tg_id, acc_log_message)

@@ -1,10 +1,5 @@
 import functools
 import inspect
-import time
-
-import keyboard
-# import pyautogui
-import telebot
 
 from settings import views
 from .log_message import LogMessage
@@ -64,4 +59,3 @@ class ValidatorHandler:
 
 
 validator_handler = ValidatorHandler()
-

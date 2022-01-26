@@ -28,8 +28,13 @@ class BaseUser:
         self.block_template = 0
         self.last_answer_time = 0
 
-    # def __str__(self):
-    #     return self.name
+    def __str__(self):
+        return self.name
+
+    def __eq__(self, other):
+        if isinstance(other, BaseUser):
+            return self.user_id == other.user_id
+        return False
 
     async def add_state(self) -> None:
         self.state += 1
@@ -53,7 +58,7 @@ class BaseUser:
             DbUser.blocking(self.user_id),
             self.send_number(text)
         )
-        self.overlord.unverified_users.append(self.user_id)  # todo
+        self.overlord.banned_users.append(self.user_id)  # todo
 
     async def act(self, text: str):
         await self.add_state()

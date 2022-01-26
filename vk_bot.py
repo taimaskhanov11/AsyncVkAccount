@@ -3,20 +3,19 @@ import collections
 import multiprocessing
 import random
 import threading
-import time
 
 from aiogram import Bot
 from aiovk import API, TokenSession
 from aiovk.exceptions import VkAuthError
 from aiovk.longpoll import UserLongPoll
 from colorama import init as colorama_init
-from tqdm import trange
 from vk_api.longpoll import Event, VkEventType
 
 from core.classes import BaseUser, TimeTrack
+from core.classes.session_user import SessionUser
 from core.database.models import DbAccount, DbUser
 from core.database.tortoise_db import init_tortoise
-from core.handlers.log_message import LogMessage, AsyncLogMessage
+from core.handlers.log_message import LogMessage
 from core.message_handler import MessageHandler
 from core.utils.find_most_city import find_most_city
 from core.validators import MessageValidator, UserValidator
@@ -34,7 +33,8 @@ class AdminAccount:
     """Котролирует все процессы над аккаунтом"""
 
     def __init__(
-            self, vk_token: str,
+            self,
+            vk_token: str,
             tg_token: str,
             tg_user_id: int,
             log_message: LogMessage
@@ -63,26 +63,19 @@ class AdminAccount:
         self.friend_status_1 = ai_logic['просьба принять заявку']['выход']
 
         self.users_objects = {}
-        self.verified_users = []
-        self.unverified_users = []
-        self.verifying_users = []
+        self.authenticated_users = []
+        self.banned_users = []
+        self.under_consideration_user = []
 
         self.validator = UserValidator(self)
         self.message_validator = MessageValidator(bad_words)
 
-        # if isinstance(log_collector_queue, LogMessage):
-        #     print('LogMessage')
-        #     self.log = log_collector_queue  # todo
-        # else:
-        #     print('log_collector_queue')
-        #     self.log = LogMessage(log_collector_queue)  # todo
-
-        # self.log = AsyncLogMessage(log_collector_queue)  # todo
         self.log = log_message  # todo
         self.message_handler = MessageHandler(self)
 
         self.users_block = collections.defaultdict(int)
         self.DEFAULT_EVENT_CLASS = Event
+
         self.info = None
         self.first_name = None
         self.user_id = None
@@ -101,9 +94,9 @@ class AdminAccount:
             _id = db_user.user_id
             self.users_objects[_id] = BaseUser(_id, db_user, self, db_user.state, db_user.first_name, db_user.city)
             if db_user.blocked:
-                self.unverified_users.append(_id)
+                self.banned_users.append(_id)
             else:
-                self.verified_users.append(_id)
+                self.authenticated_users.append(_id)
 
     async def send_number_tg(self, text: str) -> None:
         """Отправка полученного номера в телеграмм по id"""
@@ -197,7 +190,7 @@ class AdminAccount:
         user_object = BaseUser(user_id, db_user, self, 0, first_name, city)
 
         self.users_objects[user_id] = user_object
-        self.verified_users.append(user_id) if mode else self.unverified_users.append(user_id)
+        self.authenticated_users.append(user_id) if mode else self.banned_users.append(user_id)
         return user_object, db_user
 
     async def signal_checking(self):
@@ -243,34 +236,34 @@ class AdminAccount:
         return True
 
     async def add_to_blacklist(self, user_id: int):
-        self.unverified_users.append(user_id)
+        self.banned_users.append(user_id)
         await DbUser.blocking(user_id)
 
-    async def create_response(self, user_id: int, text: str) -> None:
+    async def create_response(self, su) -> None:
         """Идентификация и обработка пользователя"""
 
-        auth_user: BaseUser = self.users_objects[user_id]
+        auth_user: BaseUser = self.users_objects[su.user_id]
         db_user: DbUser = await DbUser.get(user_id=auth_user.user_id)  # todo
 
         # Проверка на запрещенные слова
-        if self.message_validator.check_for_bad_words(text):
-            await self.add_to_blacklist(user_id)
-            self.log('bad_word', auth_user.name, user_id)
+        if self.message_validator.check_for_bad_words(su.text):
+            await self.add_to_blacklist(su.user_id)
+            self.log('bad_word', auth_user.name, su.user_id)
 
         # Проверка на стадию разговора, если больше - в черный список
         elif auth_user.state > self.state_answer_count:
-            await self.add_to_blacklist(user_id)
-            self.log('blacklist_message', auth_user.name, text)
+            await self.add_to_blacklist(su.user_id)
+            self.log('blacklist_message', auth_user.name, su.text)
 
         # Проверка на частоту сообщений если меньше self.block_message_count - отвечает
         elif auth_user.block_template < self.block_message_count:
-            self.log('auth_user_message', auth_user.name, user_id, text)
-            await self.create_answer(text, auth_user, db_user)  # Создание ответа
+            self.log('auth_user_message', auth_user.name, su.user_id, su.text)
+            await self.create_answer(su.text, auth_user, db_user)  # Создание ответа
 
         else:
             # Проверка на частоту сообщений если больше self.block_message_count - игнорит
-            await self.message_handler.save_message(db_user, text, 'блок', 'блок')
-            self.log('spam_message', auth_user.name, user_id, text)
+            await self.message_handler.save_message(db_user, su.text, 'блок', 'блок')
+            self.log('spam_message', auth_user.name, su.user_id, su.text)
 
     async def user_is_valid(self, city, user_id, first_name, last_name, photo_url):
         auth_user, table_user = await self.update_users(user_id, first_name, last_name, city=city,
@@ -308,48 +301,59 @@ class AdminAccount:
         else:
             return await self.user_is_invalid(user_id, first_name, last_name, photo_url)
 
-    async def wait_for_verification(self, user_id: int, delay: int) -> None:
-        self.log('wait_for_verification', user_id, delay)
+    async def wait_for_authentication(self, su, delay: int) -> None:
+        self.log('wait_for_verification', su.user_id, delay)
         await asyncio.sleep(delay)  # todo
 
-    async def for_unverified_users(self, user_id: int, text: str):
-        auth_user = self.users_objects[user_id]
+    async def for_unverified_users(self, session_user):
+        auth_user = self.users_objects[session_user.user_id]
         table_user = await DbUser.get(user_id=auth_user.user_id)  # todo
-        await self.message_handler.save_message(table_user, text, 'ЧС', 'ЧС'),  # todo
-        self.log('blacklist_message', auth_user.name, text)
+        await self.message_handler.save_message(table_user, session_user.text, 'ЧС', 'ЧС'),  # todo
+        self.log('blacklist_message', auth_user.name, session_user.text)
 
-    async def identification(self, user_id: int, text: str) -> None:
-        # Если нету в базе
-        self.verifying_users.append(user_id)
+    async def identification(self, su) -> None:
+
+        self.under_consideration_user.append(su.user_id)
         # await asyncio.sleep(2)
-        verified = await self.verify_user(user_id, text)
+        verified = await self.verify_user(su.user_id, su.text)
 
         if verified:
-            await self.create_answer(text, *verified)
-        self.verifying_users.remove(user_id)
+            await self.create_answer(su.text, *verified)
+        self.under_consideration_user.remove(su.user_id)
 
     async def event_analysis(self, event: Event) -> None:
         """Разбор события"""
-        # session_user = SessionUser(user_id=event.user_id, text = event.text.lower())
-        text = event.text.lower()
-        user_id = event.user_id
+        su = SessionUser(
+            event.user_id, event.text.lower(), self
+        )
+
+        # text = event.text.lower()
+        # user_id = event.user_id
+
+        # user = self.users_objects.get(su.user_id) #todo
+        #
+        # match user:
+        #     case BannedUser:
+        #         pass
+        #     case AuthUser:
+        #         pass
+        res_time_track = TimeTrack(su, self.log)  # todo
 
         # Ожидаем завершения проверки
-        if user_id in self.verifying_users:
-            await self.wait_for_verification(user_id, 2)
+        if su in self.under_consideration_user:
+            await self.wait_for_authentication(su, 2)
 
-        res_time_track = TimeTrack(user_id, self.log)  # todo
+        if su in self.banned_users:
+            await self.for_unverified_users(su)
 
-        if user_id in self.unverified_users:
-            await self.for_unverified_users(user_id, text)
-
-        elif user_id in self.verified_users:
+        elif su in self.authenticated_users:
             # Создание ответа
-            await self.create_response(user_id, text)
+            await self.create_response(su)
             res_time_track.stop()
 
         else:
-            await self.identification(user_id, text)
+            # Если нету в базе
+            await self.identification(su)
 
         res_time_track.stop(check=True)
 
@@ -357,6 +361,7 @@ class AdminAccount:
         self.log('parse_message_event', self.first_name)
         async for event_a in self.longpoll.iter():
             if not self.start_status:
+                # Остановка парсинга при отключении статуса
                 self.log('stopping_loop', self.first_name)
                 break
 
@@ -373,7 +378,7 @@ class AdminAccount:
         """Запуст и выгрузка основных данных"""
 
         # Инициализация базы данных
-        await init_tortoise(*db_config.values())
+        await init_tortoise(*db_config.values())  # todo 26.01.2022 14:09 taima: вынести в общий
 
         if not await self.check_and_get_self_info():
             return False
@@ -417,6 +422,13 @@ class AdminAccount:
                 self.log('auth_error', e)
             # finally:
             #     await self.session.close()
+            finally:
+                await self.session.close()
+
+                # Создание новой сессии
+                self.session = TokenSession(self.token)
+                self.api = API(self.session)
+                self.longpoll = UserLongPoll(self.api, mode=1, version=3)
 
 # log_handler.init_choice_logging(__name__,
 #                                 *__all__)
