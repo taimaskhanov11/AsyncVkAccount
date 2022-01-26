@@ -15,13 +15,27 @@ __all__ = [
 
 async def init_tortoise(username, password, host, port, db_name):
     # async def init_tortoise(config):
-    await Tortoise.init(  # todo
-        # db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
-        # db_url='postgres://postgres:postgres@localhost:5432/django_db',
-        # db_url=f'postgres://{username}:{password}@db:{port}/{db_name}',
-        db_url=f'postgres://{username}:{password}@{host}:{port}/{db_name}',
-        modules={'models': ['core.database.models']}
-    )
+
+    try:
+        await Tortoise.init(  # todo
+            _create_db=True,
+            # db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
+            # db_url='postgres://postgres:postgres@localhost:5432/django_db',
+            # db_url=f'postgres://{username}:{password}@db:{port}/{db_name}',
+            db_url=f'postgres://{username}:{password}@{host}:{port}/{db_name}',
+            modules={'models': ['core.database.models']}
+        )
+        logger.info('Создание базы')
+
+    except Exception as e:
+        await Tortoise.init(  # todo
+            # db_url='postgres://postgres:postgres@localhost:5432/vk_controller',
+            # db_url='postgres://postgres:postgres@localhost:5432/django_db',
+            # db_url=f'postgres://{username}:{password}@db:{port}/{db_name}',
+            db_url=f'postgres://{username}:{password}@{host}:{port}/{db_name}',
+            modules={'models': ['core.database.models']}
+        )
+        logger.info('База существует')
     await Tortoise.generate_schemas()
 
 
