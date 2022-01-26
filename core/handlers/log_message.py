@@ -57,7 +57,7 @@ class LogMessage:
         # text_handler(text,
         #              'debug',
         #              talk=False, prop=True)
-        logger.debug(text)
+        logger.trace(text)
 
     @staticmethod
     def exp_log_error(e):

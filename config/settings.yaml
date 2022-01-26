@@ -11,6 +11,7 @@ text_handler_controller:
 
 # Логирование
 log_settings:
+  TRACE: true
   DEBUG: true
   INFO: true
   TALK: true

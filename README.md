@@ -14,7 +14,7 @@ pip install -r requirements.txt
   - токены `config/settings.yaml`
   - варианты ответа -  `ai_logic.json`
   - стадии общения - `conversation_stages.json`
-
+  - фото для отправки - `config/image`
 
 ###Запускать через `main.py`
 ## Todo

