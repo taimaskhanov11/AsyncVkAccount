@@ -1,5 +1,5 @@
 # Текущая версия бота
-version: 2.9.2.2
+version: 3.0.0.1
 
 # Логирование
 text_handler_controller:
@@ -11,7 +11,7 @@ text_handler_controller:
 
 # Логирование
 log_settings:
-  DEBUG: false
+  DEBUG: true
   INFO: true
   TALK: true
   XANSWER: true
